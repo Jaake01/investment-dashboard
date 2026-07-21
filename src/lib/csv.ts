@@ -2,6 +2,7 @@ import Papa from 'papaparse';
 import type { AssetClass, ImportedHoldingRow, Transaction, TransactionAction } from '../types';
 import { ASSET_CLASSES } from '../types';
 import { aggregateHoldingsFromTransactions } from './transactions';
+import { guessAssetClassFromSymbol } from './symbolClass';
 
 export class CsvImportError extends Error {}
 
@@ -9,16 +10,16 @@ function normalizeHeader(header: string): string {
   return header.trim().toLowerCase().replace(/[\s_-]+/g, '');
 }
 
-function parseAssetClass(raw: string | undefined): AssetClass {
+// Falls back to guessing from the symbol whenever the class column is missing
+// or too generic to tell US vs TW stock apart (e.g. plain "股票"/"stock").
+function parseAssetClass(raw: string | undefined, symbol: string): AssetClass {
   const value = (raw ?? '').trim().toLowerCase();
   if (ASSET_CLASSES.includes(value as AssetClass)) return value as AssetClass;
   if (value === 'us stock' || value === 'usstock' || value === 'us_stock' || value === '美股') return 'us_stock';
   if (value === 'tw stock' || value === 'twstock' || value === 'tw_stock' || value === '台股') return 'tw_stock';
   if (value === 'crypto' || value === 'cryptocurrency' || value === '加密貨幣' || value === '加密货币') return 'crypto';
   if (value === 'cash' || value === '現金' || value === '现金') return 'cash';
-  // Generic "stock"/"equity"/"股票" can't tell US vs TW apart, so it falls back to us_stock.
-  if (value === 'stocks' || value === 'equity' || value === '股票') return 'us_stock';
-  return 'us_stock';
+  return guessAssetClassFromSymbol(symbol);
 }
 
 function parseNumber(raw: string | undefined, field: string, rowIndex: number): number {
@@ -72,7 +73,7 @@ export function parseHoldingsCsv(csvText: string): ImportedHoldingRow[] {
       symbol,
       shares: parseNumber(row[sharesKey], 'shares', index),
       avgCost: parseNumber(row[avgCostKey], 'avgCost', index),
-      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey]) : 'us_stock',
+      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey], symbol) : guessAssetClassFromSymbol(symbol),
       name: nameKey ? row[nameKey]?.trim() || undefined : undefined,
     };
   });
@@ -112,7 +113,7 @@ export function parseTransactionsCsv(csvText: string): Transaction[] {
     }
     return {
       date: (row[dateKey] ?? '').trim(),
-      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey]) : 'us_stock',
+      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey], symbol) : guessAssetClassFromSymbol(symbol),
       symbol,
       action: parseAction(row[actionKey], index),
       price: parseNumber(row[priceKey], '成交價格', index),

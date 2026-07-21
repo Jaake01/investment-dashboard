@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS, type AssetClass } from '../types';
+import { guessAssetClassFromSymbol } from '../lib/symbolClass';
 
 interface HoldingFormModalProps {
   editingId: string | null;
@@ -12,12 +13,20 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
   const editingHolding = editingId ? holdings.find((h) => h.id === editingId) : undefined;
 
   const [symbol, setSymbol] = useState(editingHolding?.symbol ?? '');
-  const [name, setName] = useState(editingHolding?.name ?? '');
   const [shares, setShares] = useState(editingHolding ? String(editingHolding.shares) : '');
   const [avgCost, setAvgCost] = useState(editingHolding ? String(editingHolding.avgCost) : '');
-  const [assetClass, setAssetClass] = useState<AssetClass>(editingHolding?.assetClass ?? 'stock');
+  const [assetClass, setAssetClass] = useState<AssetClass>(editingHolding?.assetClass ?? 'us_stock');
+  // Once true, the class dropdown won't be overwritten by symbol-based guessing anymore.
+  const [classTouched, setClassTouched] = useState(!!editingHolding);
   const [notes, setNotes] = useState(editingHolding?.notes ?? '');
   const [error, setError] = useState('');
+
+  const handleSymbolChange = (value: string) => {
+    setSymbol(value);
+    if (!classTouched) {
+      setAssetClass(guessAssetClassFromSymbol(value));
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -39,7 +48,6 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
 
     const input = {
       symbol: symbol.trim().toUpperCase(),
-      name: name.trim() || undefined,
       shares: sharesNum,
       avgCost: avgCostNum,
       assetClass,
@@ -61,11 +69,7 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
         <form onSubmit={handleSubmit}>
           <label>
             代號
-            <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="AAPL" />
-          </label>
-          <label>
-            名稱（選填）
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Apple Inc." />
+            <input value={symbol} onChange={(e) => handleSymbolChange(e.target.value)} placeholder="AAPL" />
           </label>
           <label>
             股數
@@ -89,7 +93,13 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
           </label>
           <label>
             資產類別
-            <select value={assetClass} onChange={(e) => setAssetClass(e.target.value as AssetClass)}>
+            <select
+              value={assetClass}
+              onChange={(e) => {
+                setAssetClass(e.target.value as AssetClass);
+                setClassTouched(true);
+              }}
+            >
               {ASSET_CLASSES.map((ac) => (
                 <option key={ac} value={ac}>
                   {ASSET_CLASS_LABELS[ac]}

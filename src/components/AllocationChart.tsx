@@ -1,14 +1,16 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { usePortfolio } from '../context/PortfolioContext';
+import { useFxRate } from '../hooks/useFxRate';
 import { computeAllocation, computeHoldingMetrics } from '../lib/calculations';
-import { formatCurrency } from '../lib/format';
+import { formatCurrencyIn } from '../lib/format';
 
 const COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 
 export function AllocationChart() {
   const { holdings, prices, settings, setSettings } = usePortfolio();
+  const { effectiveUsdToTwd } = useFxRate();
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
-  const allocation = computeAllocation(metrics, settings.allocationGroupBy);
+  const allocation = computeAllocation(metrics, settings.allocationGroupBy, effectiveUsdToTwd);
 
   return (
     <section className="card">
@@ -33,10 +35,13 @@ export function AllocationChart() {
                 <Cell key={entry.key} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+            <Tooltip formatter={(value) => formatCurrencyIn(Number(value), 'TWD')} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
+      )}
+      {effectiveUsdToTwd === null && (
+        <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>
       )}
     </section>
   );

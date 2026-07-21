@@ -1,12 +1,30 @@
-export type AssetClass = 'stock' | 'crypto' | 'cash' | 'other';
+export type AssetClass = 'us_stock' | 'tw_stock' | 'crypto' | 'cash' | 'other';
 
-export const ASSET_CLASSES: AssetClass[] = ['stock', 'crypto', 'cash', 'other'];
+export const ASSET_CLASSES: AssetClass[] = ['us_stock', 'tw_stock', 'crypto', 'cash', 'other'];
 
 export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
-  stock: '股票',
+  us_stock: '美股',
+  tw_stock: '台股',
   crypto: '加密貨幣',
   cash: '現金',
   other: '其他',
+};
+
+export type Currency = 'USD' | 'TWD' | 'USDC';
+
+export const CURRENCY_LABELS: Record<Currency, string> = {
+  USD: '美元 (USD)',
+  TWD: '台幣 (TWD)',
+  USDC: 'USDC',
+};
+
+// USDC is a USD-pegged stablecoin, treated as 1:1 with USD for conversion purposes.
+export const CURRENCY_FOR_ASSET_CLASS: Record<AssetClass, Currency> = {
+  us_stock: 'USD',
+  tw_stock: 'TWD',
+  crypto: 'USDC',
+  cash: 'TWD',
+  other: 'TWD',
 };
 
 export interface Holding {
@@ -27,12 +45,21 @@ export interface Settings {
   priceProvider: PriceProviderId;
   apiKey: string;
   allocationGroupBy: 'holding' | 'assetClass';
+  fxAutoRefresh: boolean;
+  manualUsdTwdRate: number;
+  autoSyncEnabled: boolean;
 }
 
 export interface PriceEntry {
   symbol: string;
   price: number;
   updatedAt: string;
+}
+
+export interface FxRate {
+  usdToTwd: number;
+  updatedAt: string;
+  source: 'auto' | 'manual';
 }
 
 export interface Snapshot {
@@ -46,4 +73,15 @@ export interface ImportedHoldingRow {
   avgCost: number;
   assetClass: AssetClass;
   name?: string;
+}
+
+export type TransactionAction = 'buy' | 'sell';
+
+export interface Transaction {
+  date: string;
+  assetClass: AssetClass;
+  symbol: string;
+  action: TransactionAction;
+  price: number;
+  amount: number;
 }

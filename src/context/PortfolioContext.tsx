@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
+import type { FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
@@ -10,6 +10,9 @@ const DEFAULT_SETTINGS: Settings = {
   priceProvider: 'none',
   apiKey: '',
   allocationGroupBy: 'holding',
+  fxAutoRefresh: true,
+  manualUsdTwdRate: 0,
+  autoSyncEnabled: false,
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;
@@ -19,6 +22,7 @@ interface PortfolioContextValue {
   settings: Settings;
   prices: Record<string, PriceEntry>;
   snapshots: Snapshot[];
+  fxRate: FxRate | null;
   addHolding: (input: NewHoldingInput) => void;
   updateHolding: (id: string, patch: Partial<NewHoldingInput>) => void;
   deleteHolding: (id: string) => void;
@@ -27,6 +31,7 @@ interface PortfolioContextValue {
   setSettings: (patch: Partial<Settings>) => void;
   applyPriceUpdates: (entries: PriceEntry[]) => void;
   recordCurrentSnapshot: (totalValue: number) => void;
+  setFxRate: (rate: FxRate) => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null);
@@ -36,12 +41,14 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettingsState] = useLocalStorage<Settings>(storageKey('settings'), DEFAULT_SETTINGS);
   const [prices, setPrices] = useLocalStorage<Record<string, PriceEntry>>(storageKey('prices'), {});
   const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>(storageKey('snapshots'), []);
+  const [fxRate, setFxRateState] = useLocalStorage<FxRate | null>(storageKey('fxRate'), null);
 
   const value = useMemo<PortfolioContextValue>(() => ({
     holdings,
     settings,
     prices,
     snapshots,
+    fxRate,
 
     addHolding: (input) => {
       setHoldings([...holdings, { ...input, id: newId(), source: 'manual' }]);
@@ -111,7 +118,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     recordCurrentSnapshot: (totalValue) => {
       setSnapshots(recordSnapshot(snapshots, totalValue));
     },
-  }), [holdings, settings, prices, snapshots, setHoldings, setSettingsState, setPrices, setSnapshots]);
+
+    setFxRate: (rate) => {
+      setFxRateState(rate);
+    },
+  }), [holdings, settings, prices, snapshots, fxRate, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
 }

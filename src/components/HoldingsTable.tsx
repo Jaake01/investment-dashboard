@@ -1,14 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
-import { formatCurrency, formatNumber, formatPercent } from '../lib/format';
-import { ASSET_CLASS_LABELS } from '../types';
+import { formatCurrencyIn, formatNumber, formatPercent } from '../lib/format';
+import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
 export function HoldingsTable() {
   const { holdings, prices, deleteHolding } = usePortfolio();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
 
@@ -29,7 +42,6 @@ export function HoldingsTable() {
             <thead>
               <tr>
                 <th>代號</th>
-                <th>名稱</th>
                 <th>類別</th>
                 <th>股數</th>
                 <th>平均成本</th>
@@ -43,34 +55,53 @@ export function HoldingsTable() {
             <tbody>
               {metrics.map((m) => {
                 const isGain = m.gainLoss >= 0;
+                const currency = CURRENCY_FOR_ASSET_CLASS[m.holding.assetClass];
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
-                    <td>{m.holding.name || '—'}</td>
                     <td>{ASSET_CLASS_LABELS[m.holding.assetClass]}</td>
                     <td>{formatNumber(m.holding.shares)}</td>
-                    <td>{formatCurrency(m.holding.avgCost)}</td>
+                    <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>
                     <td>
-                      {formatCurrency(m.currentPrice)}
+                      {formatCurrencyIn(m.currentPrice, currency)}
                       {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
                     </td>
-                    <td>{formatCurrency(m.marketValue)}</td>
-                    <td className={isGain ? 'gain' : 'loss'}>{formatCurrency(m.gainLoss)}</td>
+                    <td>{formatCurrencyIn(m.marketValue, currency)}</td>
+                    <td className={isGain ? 'gain' : 'loss'}>{formatCurrencyIn(m.gainLoss, currency)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
-                      <button className="btn btn-small" onClick={() => setEditingId(m.holding.id)}>
-                        編輯
-                      </button>
-                      <button
-                        className="btn btn-small btn-danger"
-                        onClick={() => {
-                          if (window.confirm(`確定要刪除「${m.holding.symbol || m.holding.name}」嗎？`)) {
-                            deleteHolding(m.holding.id);
-                          }
-                        }}
-                      >
-                        刪除
-                      </button>
+                      <div className="row-menu" ref={openMenuId === m.holding.id ? menuRef : undefined}>
+                        <button
+                          className="btn btn-small btn-icon"
+                          aria-label="更多操作"
+                          onClick={() => setOpenMenuId(openMenuId === m.holding.id ? null : m.holding.id)}
+                        >
+                          ⋯
+                        </button>
+                        {openMenuId === m.holding.id && (
+                          <div className="row-menu-dropdown">
+                            <button
+                              onClick={() => {
+                                setEditingId(m.holding.id);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              編輯
+                            </button>
+                            <button
+                              className="danger"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                if (window.confirm(`確定要刪除「${m.holding.symbol || '這筆持股'}」嗎？`)) {
+                                  deleteHolding(m.holding.id);
+                                }
+                              }}
+                            >
+                              刪除
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

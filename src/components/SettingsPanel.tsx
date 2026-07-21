@@ -4,12 +4,14 @@ import { CsvImportError, fetchAndParseSheet } from '../lib/csv';
 import { PRICE_PROVIDERS } from '../lib/priceProviders';
 import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
+import { useAutoSync } from '../hooks/useAutoSync';
 import type { ImportedHoldingRow, PriceProviderId } from '../types';
 
 export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, effectiveSource } = useFxRate();
+  const { isSyncing: isAutoSyncing, error: autoSyncError, lastSyncedAt } = useAutoSync();
 
   const handleRefreshAll = async () => {
     await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve()]);
@@ -39,8 +41,8 @@ export function SettingsPanel() {
       <div className="settings-group">
         <h3>Google Sheet 匯入</h3>
         <p className="settings-hint">
-          在 Google Sheet 使用「檔案 → 共用 → 發布到網路」，格式選擇 CSV，將產生的網址貼在下方。欄位需包含
-          symbol、shares、avgCost，assetClass 與 name 為選填。
+          在 Google Sheet 使用「檔案 → 共用 → 發布到網路」，格式選擇 CSV，將產生的網址貼在下方。支援兩種格式，程式會自動判斷：
+          「持股快照」（symbol、shares、avgCost，assetClass 與 name 選填）或「交易紀錄」（交易日期、類別、代號、動作、成交價格、成交金額——有「動作」欄位就視為交易紀錄，自動換算股數與加權平均成本）。
         </p>
         <div className="settings-row">
           <input
@@ -54,6 +56,27 @@ export function SettingsPanel() {
           </button>
         </div>
         {importError && <p className="form-error">{importError}</p>}
+
+        <div className="settings-row">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={settings.autoSyncEnabled}
+              onChange={(e) => setSettings({ autoSyncEnabled: e.target.checked })}
+            />
+            自動同步（每 15 分鐘依代號合併一次，不會跳確認視窗）
+          </label>
+        </div>
+        {settings.autoSyncEnabled && (
+          <p className="settings-hint">
+            {isAutoSyncing
+              ? '同步中…'
+              : lastSyncedAt
+                ? `上次自動同步：${new Date(lastSyncedAt).toLocaleTimeString('zh-TW')}`
+                : '尚未同步'}
+          </p>
+        )}
+        {autoSyncError && <p className="form-error">{autoSyncError}</p>}
 
         {pendingRows && (
           <div className="import-confirm">

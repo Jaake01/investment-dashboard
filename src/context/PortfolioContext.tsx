@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   allocationGroupBy: 'holding',
   fxAutoRefresh: true,
   manualUsdTwdRate: 0,
+  autoSyncEnabled: false,
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

@@ -47,6 +47,7 @@ export interface Settings {
   allocationGroupBy: 'holding' | 'assetClass';
   fxAutoRefresh: boolean;
   manualUsdTwdRate: number;
+  autoSyncEnabled: boolean;
 }
 
 export interface PriceEntry {
@@ -72,4 +73,15 @@ export interface ImportedHoldingRow {
   avgCost: number;
   assetClass: AssetClass;
   name?: string;
+}
+
+export type TransactionAction = 'buy' | 'sell';
+
+export interface Transaction {
+  date: string;
+  assetClass: AssetClass;
+  symbol: string;
+  action: TransactionAction;
+  price: number;
+  amount: number;
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
-import { computeHoldingMetrics, computePortfolioTotals } from '../lib/calculations';
+import { computeHoldingMetrics, computeTotalInTwd } from '../lib/calculations';
+import { useFxRate } from './useFxRate';
 import type { PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
@@ -16,6 +17,7 @@ function sleep(ms: number) {
 
 export function usePrices() {
   const { holdings, settings, prices, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
+  const { effectiveUsdToTwd } = useFxRate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -75,8 +77,10 @@ export function usePrices() {
         mergedPrices[entry.symbol] = entry;
       }
       const metrics = holdings.map((h) => computeHoldingMetrics(h, mergedPrices));
-      const totals = computePortfolioTotals(metrics);
-      recordCurrentSnapshot(totals.totalMarketValue);
+      const totalTwd = computeTotalInTwd(metrics, effectiveUsdToTwd);
+      if (totalTwd !== null) {
+        recordCurrentSnapshot(totalTwd);
+      }
     }
 
     setErrors(fetchErrors);

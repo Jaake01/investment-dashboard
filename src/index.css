@@ -271,6 +271,14 @@ th {
   min-width: 160px;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+}
+
 input, select {
   padding: 7px 10px;
   border-radius: 6px;

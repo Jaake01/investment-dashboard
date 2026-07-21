@@ -11,10 +11,13 @@ function normalizeHeader(header: string): string {
 function parseAssetClass(raw: string | undefined): AssetClass {
   const value = (raw ?? '').trim().toLowerCase();
   if (ASSET_CLASSES.includes(value as AssetClass)) return value as AssetClass;
-  if (value === 'stocks' || value === 'equity' || value === '股票') return 'stock';
+  if (value === 'us stock' || value === 'usstock' || value === 'us_stock' || value === '美股') return 'us_stock';
+  if (value === 'tw stock' || value === 'twstock' || value === 'tw_stock' || value === '台股') return 'tw_stock';
   if (value === 'crypto' || value === 'cryptocurrency' || value === '加密貨幣' || value === '加密货币') return 'crypto';
   if (value === 'cash' || value === '現金' || value === '现金') return 'cash';
-  return 'stock';
+  // Generic "stock"/"equity"/"股票" can't tell US vs TW apart, so it falls back to us_stock.
+  if (value === 'stocks' || value === 'equity' || value === '股票') return 'us_stock';
+  return 'us_stock';
 }
 
 function parseNumber(raw: string | undefined, field: string, rowIndex: number): number {
@@ -61,7 +64,7 @@ export function parseHoldingsCsv(csvText: string): ImportedHoldingRow[] {
       symbol,
       shares: parseNumber(row[sharesKey], 'shares', index),
       avgCost: parseNumber(row[avgCostKey], 'avgCost', index),
-      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey]) : 'stock',
+      assetClass: assetClassKey ? parseAssetClass(row[assetClassKey]) : 'us_stock',
       name: nameKey ? row[nameKey]?.trim() || undefined : undefined,
     };
   });

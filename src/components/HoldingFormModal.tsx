@@ -15,7 +15,7 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
   const [name, setName] = useState(editingHolding?.name ?? '');
   const [shares, setShares] = useState(editingHolding ? String(editingHolding.shares) : '');
   const [avgCost, setAvgCost] = useState(editingHolding ? String(editingHolding.avgCost) : '');
-  const [assetClass, setAssetClass] = useState<AssetClass>(editingHolding?.assetClass ?? 'stock');
+  const [assetClass, setAssetClass] = useState<AssetClass>(editingHolding?.assetClass ?? 'us_stock');
   const [notes, setNotes] = useState(editingHolding?.notes ?? '');
   const [error, setError] = useState('');
 

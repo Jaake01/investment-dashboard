@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
-import { formatCurrency, formatNumber, formatPercent } from '../lib/format';
-import { ASSET_CLASS_LABELS } from '../types';
+import { formatCurrencyIn, formatNumber, formatPercent } from '../lib/format';
+import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
 export function HoldingsTable() {
@@ -43,19 +43,20 @@ export function HoldingsTable() {
             <tbody>
               {metrics.map((m) => {
                 const isGain = m.gainLoss >= 0;
+                const currency = CURRENCY_FOR_ASSET_CLASS[m.holding.assetClass];
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
                     <td>{m.holding.name || '—'}</td>
                     <td>{ASSET_CLASS_LABELS[m.holding.assetClass]}</td>
                     <td>{formatNumber(m.holding.shares)}</td>
-                    <td>{formatCurrency(m.holding.avgCost)}</td>
+                    <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>
                     <td>
-                      {formatCurrency(m.currentPrice)}
+                      {formatCurrencyIn(m.currentPrice, currency)}
                       {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
                     </td>
-                    <td>{formatCurrency(m.marketValue)}</td>
-                    <td className={isGain ? 'gain' : 'loss'}>{formatCurrency(m.gainLoss)}</td>
+                    <td>{formatCurrencyIn(m.marketValue, currency)}</td>
+                    <td className={isGain ? 'gain' : 'loss'}>{formatCurrencyIn(m.gainLoss, currency)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
                       <button className="btn btn-small" onClick={() => setEditingId(m.holding.id)}>

@@ -1,7 +1,7 @@
 import { PortfolioSummary } from './PortfolioSummary';
 import { CurrencyBreakdown } from './CurrencyBreakdown';
+import { AllocationTreemap } from './AllocationTreemap';
 import { HoldingsTable } from './HoldingsTable';
-import { AllocationChart } from './AllocationChart';
 import { TrendChart } from './TrendChart';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -14,11 +14,9 @@ export function Layout() {
       <main className="app-main">
         <PortfolioSummary />
         <CurrencyBreakdown />
+        <AllocationTreemap />
         <HoldingsTable />
-        <div className="charts-grid">
-          <AllocationChart />
-          <TrendChart />
-        </div>
+        <TrendChart />
         <SettingsPanel />
       </main>
     </div>

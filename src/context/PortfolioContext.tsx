@@ -15,7 +15,6 @@ const DEFAULT_SETTINGS: Settings = {
   sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBIuqXFPsT877PFN1HiRva1Uw1pKx681DQJcMSEUymzTdIrKjRyNSmurR-QQ33NFJbw0qE9Auacr7W/pub?output=csv',
   priceProvider: 'none',
   apiKey: '',
-  allocationGroupBy: 'holding',
   fxAutoRefresh: true,
   autoSyncEnabled: true,
 };

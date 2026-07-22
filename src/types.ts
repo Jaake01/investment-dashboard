@@ -44,7 +44,6 @@ export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
   apiKey: string;
-  allocationGroupBy: 'holding' | 'assetClass';
   fxAutoRefresh: boolean;
   autoSyncEnabled: boolean;
 }

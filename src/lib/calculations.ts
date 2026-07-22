@@ -67,6 +67,25 @@ export function computeAllocation(
   return Array.from(map.values()).sort((a, b) => b.value - a.value);
 }
 
+// For drilling into a single asset class: every holding here already shares
+// the same native currency, so this skips TWD conversion (unlike
+// computeAllocation) and keeps values in that class's native currency.
+export function computeHoldingsWithinClass(metrics: HoldingMetrics[]): AllocationSlice[] {
+  const map = new Map<string, AllocationSlice>();
+  for (const m of metrics) {
+    if (m.marketValue <= 0) continue;
+    const key = m.holding.id;
+    const label = m.holding.symbol || m.holding.name || '未命名';
+    const existing = map.get(key);
+    if (existing) {
+      existing.value += m.marketValue;
+    } else {
+      map.set(key, { key, label, value: m.marketValue });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.value - a.value);
+}
+
 export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }

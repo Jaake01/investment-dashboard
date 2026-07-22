@@ -5,14 +5,20 @@ import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
 import { recordSnapshot } from '../hooks/useSnapshots';
 
+// Pre-filled with the owner's own published sheet so the dashboard connects
+// automatically on first load without requiring the URL to be pasted in
+// manually. This sheet is already public (anyone with the link can read it
+// via "publish to web"), and since this is a client-only app the built JS
+// bundle is visible to anyone who opens the deployed site regardless, so
+// there's no meaningful confidentiality being traded away here.
 const DEFAULT_SETTINGS: Settings = {
-  sheetUrl: '',
+  sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBIuqXFPsT877PFN1HiRva1Uw1pKx681DQJcMSEUymzTdIrKjRyNSmurR-QQ33NFJbw0qE9Auacr7W/pub?output=csv',
   priceProvider: 'none',
   apiKey: '',
   allocationGroupBy: 'holding',
   fxAutoRefresh: true,
   manualUsdTwdRate: 0,
-  autoSyncEnabled: false,
+  autoSyncEnabled: true,
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

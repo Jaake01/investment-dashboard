@@ -36,20 +36,40 @@ function toTreemapData(slices: AllocationSlice[], colorFor: (key: string, index:
   }));
 }
 
+let measureCanvas: HTMLCanvasElement | null = null;
+function measureTextWidth(text: string, fontSize: number, fontWeight: number): number {
+  if (typeof document === 'undefined') return text.length * fontSize * 0.6;
+  if (!measureCanvas) measureCanvas = document.createElement('canvas');
+  const ctx = measureCanvas.getContext('2d');
+  if (!ctx) return text.length * fontSize * 0.6;
+  ctx.font = `${fontWeight} ${fontSize}px sans-serif`;
+  return ctx.measureText(text).width;
+}
+
+const LABEL_PADDING = 8;
+
 function TreemapCell(props: any) {
   const { x, y, width, height, name, fill, percentLabel } = props;
-  const canLabel = width > 46 && height > 28;
-  const canShowPercent = canLabel && height > 46;
+
+  // Measure before drawing rather than guessing a fixed size threshold, so a
+  // label never gets rendered wider than the block it sits in (or overflows
+  // vertically) — small slices just go unlabeled instead of showing clipped
+  // or overlapping text; the tooltip still carries the value.
+  const nameWidth = measureTextWidth(name, 12, 600);
+  const canLabel = height > 24 && width > nameWidth + LABEL_PADDING * 2;
+  const percentWidth = measureTextWidth(percentLabel, 11, 400);
+  const canShowPercent = canLabel && height > 42 && width > percentWidth + LABEL_PADDING * 2;
+
   return (
     <g>
       <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
       {canLabel && (
-        <text x={x + 8} y={y + 18} fill="#fff" fontSize={12} fontWeight={600}>
+        <text x={x + LABEL_PADDING} y={y + 18} fill="#fff" fontSize={12} fontWeight={600}>
           {name}
         </text>
       )}
       {canShowPercent && (
-        <text x={x + 8} y={y + 34} fill="#fff" fontSize={11} opacity={0.9}>
+        <text x={x + LABEL_PADDING} y={y + 34} fill="#fff" fontSize={11} opacity={0.9}>
           {percentLabel}
         </text>
       )}
@@ -103,12 +123,13 @@ export function AllocationTreemap() {
           {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
         </p>
       ) : (
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={360}>
           <Treemap
             data={data}
             dataKey="value"
             nameKey="name"
             stroke="var(--card-bg)"
+            nodeGap={3}
             content={<TreemapCell />}
             isAnimationActive={false}
           >

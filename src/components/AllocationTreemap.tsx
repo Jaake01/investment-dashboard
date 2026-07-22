@@ -23,17 +23,22 @@ interface TreemapDatum {
   value: number;
   fill: string;
   percentLabel: string;
+  percent: number;
   [key: string]: unknown;
 }
 
 function toTreemapData(slices: AllocationSlice[], colorFor: (key: string, index: number) => string): TreemapDatum[] {
   const total = slices.reduce((sum, s) => sum + s.value, 0);
-  return slices.map((s, i) => ({
-    name: s.label,
-    value: s.value,
-    fill: colorFor(s.key, i),
-    percentLabel: total > 0 ? `${((s.value / total) * 100).toFixed(1)}%` : '0%',
-  }));
+  return slices.map((s, i) => {
+    const percent = total > 0 ? (s.value / total) * 100 : 0;
+    return {
+      name: s.label,
+      value: s.value,
+      fill: colorFor(s.key, i),
+      percentLabel: `${percent.toFixed(1)}%`,
+      percent,
+    };
+  });
 }
 
 let measureCanvas: HTMLCanvasElement | null = null;
@@ -46,30 +51,49 @@ function measureTextWidth(text: string, fontSize: number, fontWeight: number): n
   return ctx.measureText(text).width;
 }
 
-const LABEL_PADDING = 8;
+const LABEL_PADDING = 6;
+const MIN_FONT_SIZE = 9;
+const MAX_NAME_FONT_SIZE = 26;
+
+// Largest font size (down to MIN_FONT_SIZE) at which `text` still fits
+// within maxWidth; 0 if it doesn't fit even at the minimum.
+function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: number): number {
+  for (let size = maxSize; size >= MIN_FONT_SIZE; size -= 1) {
+    if (measureTextWidth(text, size, weight) <= maxWidth) return size;
+  }
+  return 0;
+}
 
 function TreemapCell(props: any) {
-  const { x, y, width, height, name, fill, percentLabel } = props;
+  const { x, y, width, height, name, fill, percentLabel, percent } = props;
+  const maxTextWidth = width - LABEL_PADDING * 2;
 
-  // Measure before drawing rather than guessing a fixed size threshold, so a
-  // label never gets rendered wider than the block it sits in (or overflows
-  // vertically) — small slices just go unlabeled instead of showing clipped
-  // or overlapping text; the tooltip still carries the value.
-  const nameWidth = measureTextWidth(name, 12, 600);
-  const canLabel = height > 24 && width > nameWidth + LABEL_PADDING * 2;
-  const percentWidth = measureTextWidth(percentLabel, 11, 400);
-  const canShowPercent = canLabel && height > 42 && width > percentWidth + LABEL_PADDING * 2;
+  // Desired size scales with the block's share of the total (bigger slice ->
+  // bigger text), then gets clamped down to whatever actually fits the
+  // block so it never overflows — proportional first, legible always.
+  const desiredNameSize = Math.min(MAX_NAME_FONT_SIZE, MIN_FONT_SIZE + (percent / 100) * 90);
+  const nameFontSize = fitFontSize(name, desiredNameSize, maxTextWidth, 600);
+  const percentFontSize = nameFontSize > 0 ? fitFontSize(percentLabel, Math.round(nameFontSize * 0.75), maxTextWidth, 400) : 0;
+
+  const lineGap = 2;
+  const showPercent = percentFontSize > 0 && height > nameFontSize + percentFontSize + lineGap + LABEL_PADDING;
+  const showName = nameFontSize > 0 && height > nameFontSize + LABEL_PADDING;
+
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const nameY = showPercent ? centerY - (percentFontSize + lineGap) / 2 : centerY;
+  const percentY = centerY + (nameFontSize + lineGap) / 2;
 
   return (
     <g>
       <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
-      {canLabel && (
-        <text x={x + LABEL_PADDING} y={y + 18} fill="#fff" fontSize={12} fontWeight={600}>
+      {showName && (
+        <text x={centerX} y={nameY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={nameFontSize} fontWeight={600}>
           {name}
         </text>
       )}
-      {canShowPercent && (
-        <text x={x + LABEL_PADDING} y={y + 34} fill="#fff" fontSize={11} opacity={0.9}>
+      {showPercent && (
+        <text x={centerX} y={percentY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={percentFontSize} opacity={0.9}>
           {percentLabel}
         </text>
       )}

@@ -46,7 +46,6 @@ export interface Settings {
   apiKey: string;
   allocationGroupBy: 'holding' | 'assetClass';
   fxAutoRefresh: boolean;
-  manualUsdTwdRate: number;
   autoSyncEnabled: boolean;
 }
 
@@ -59,7 +58,7 @@ export interface PriceEntry {
 export interface FxRate {
   usdToTwd: number;
   updatedAt: string;
-  source: 'auto' | 'manual';
+  source: 'auto';
 }
 
 export interface Snapshot {

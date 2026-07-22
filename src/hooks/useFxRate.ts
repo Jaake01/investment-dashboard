@@ -43,12 +43,8 @@ export function useFxRate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.fxAutoRefresh, canAutoFetch]);
 
-  const effectiveUsdToTwd = fxRate?.usdToTwd ?? (settings.manualUsdTwdRate > 0 ? settings.manualUsdTwdRate : null);
-  const effectiveSource: 'auto' | 'manual' | null = fxRate
-    ? 'auto'
-    : settings.manualUsdTwdRate > 0
-      ? 'manual'
-      : null;
+  const effectiveUsdToTwd = fxRate?.usdToTwd ?? null;
+  const updatedAt = fxRate?.updatedAt ?? null;
 
-  return { refreshFxRate, isRefreshing, error, canAutoFetch, effectiveUsdToTwd, effectiveSource };
+  return { refreshFxRate, isRefreshing, error, canAutoFetch, effectiveUsdToTwd, updatedAt };
 }

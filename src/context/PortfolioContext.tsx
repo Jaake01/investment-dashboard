@@ -17,7 +17,6 @@ const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   allocationGroupBy: 'holding',
   fxAutoRefresh: true,
-  manualUsdTwdRate: 0,
   autoSyncEnabled: true,
 };
 

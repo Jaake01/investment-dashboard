@@ -1,6 +1,8 @@
 export type AssetClass = 'us_stock' | 'tw_stock' | 'crypto' | 'cash' | 'other';
 
-export const ASSET_CLASSES: AssetClass[] = ['us_stock', 'tw_stock', 'crypto', 'cash', 'other'];
+// Canonical display order used everywhere asset classes are listed (tabs,
+// treemap blocks, dropdowns): crypto, us_stock, tw_stock, cash, other.
+export const ASSET_CLASSES: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash', 'other'];
 
 export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
   us_stock: '美股',

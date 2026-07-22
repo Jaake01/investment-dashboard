@@ -80,9 +80,9 @@ export function AllocationTreemap() {
         <h2>資產配置{selectedClass ? `（${ASSET_CLASS_LABELS[selectedClass]}）` : ''}</h2>
       </div>
 
-      <div className="treemap-tabs">
+      <div className="tab-bar">
         <button
-          className={`treemap-tab ${selectedClass === null ? 'active' : ''}`}
+          className={`tab-button ${selectedClass === null ? 'active' : ''}`}
           onClick={() => setSelectedClass(null)}
         >
           總覽
@@ -90,7 +90,7 @@ export function AllocationTreemap() {
         {topLevel.map((s) => (
           <button
             key={s.key}
-            className={`treemap-tab ${selectedClass === s.key ? 'active' : ''}`}
+            className={`tab-button ${selectedClass === s.key ? 'active' : ''}`}
             onClick={() => setSelectedClass(s.key as AssetClass)}
           >
             {s.label}

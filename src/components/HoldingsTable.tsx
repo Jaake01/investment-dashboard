@@ -2,14 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
 import { formatCurrencyIn, formatNumber, formatPercent } from '../lib/format';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS } from '../types';
+import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
+
+const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 
 export function HoldingsTable() {
   const { holdings, prices, deleteHolding } = usePortfolio();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState<AssetClass>('us_stock');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -23,7 +26,12 @@ export function HoldingsTable() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openMenuId]);
 
-  const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
+  const hasOther = holdings.some((h) => h.assetClass === 'other');
+  const tabs = hasOther ? [...BASE_TABS, 'other' as AssetClass] : BASE_TABS;
+
+  const metrics = holdings
+    .filter((h) => h.assetClass === selectedClass)
+    .map((h) => computeHoldingMetrics(h, prices));
 
   return (
     <section className="card">
@@ -34,8 +42,22 @@ export function HoldingsTable() {
         </button>
       </div>
 
+      <div className="tab-bar">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            className={`tab-button ${selectedClass === tab ? 'active' : ''}`}
+            onClick={() => setSelectedClass(tab)}
+          >
+            {ASSET_CLASS_LABELS[tab]}
+          </button>
+        ))}
+      </div>
+
       {holdings.length === 0 ? (
         <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
+      ) : metrics.length === 0 ? (
+        <p className="empty-state">「{ASSET_CLASS_LABELS[selectedClass]}」目前沒有持股。</p>
       ) : (
         <div className="table-scroll">
           <table>

@@ -278,14 +278,14 @@ th {
   border-color: var(--danger-hover);
 }
 
-.treemap-tabs {
+.tab-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 14px;
 }
 
-.treemap-tab {
+.tab-button {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -295,11 +295,11 @@ th {
   cursor: pointer;
 }
 
-.treemap-tab:hover {
+.tab-button:hover {
   border-color: var(--accent);
 }
 
-.treemap-tab.active {
+.tab-button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;

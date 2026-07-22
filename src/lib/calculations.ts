@@ -1,5 +1,5 @@
 import type { AssetClass, Currency, Holding, PriceEntry } from '../types';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS } from '../types';
+import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS } from '../types';
 
 export interface HoldingMetrics {
   holding: Holding;
@@ -64,7 +64,14 @@ export function computeAllocation(
       map.set(key, { key, label, value });
     }
   }
-  return Array.from(map.values()).sort((a, b) => b.value - a.value);
+  const slices = Array.from(map.values());
+  if (groupBy === 'assetClass') {
+    // Fixed canonical order (crypto, us_stock, tw_stock, cash, other) rather
+    // than sorting by value, so a class's position doesn't jump around as
+    // its value changes relative to the others.
+    return slices.sort((a, b) => ASSET_CLASSES.indexOf(a.key as AssetClass) - ASSET_CLASSES.indexOf(b.key as AssetClass));
+  }
+  return slices.sort((a, b) => b.value - a.value);
 }
 
 // For drilling into a single asset class: every holding here already shares
@@ -105,7 +112,10 @@ export interface CurrencyBucket {
   nativeTotal: number;
 }
 
-const CURRENCY_BUCKET_CLASSES: Array<'us_stock' | 'tw_stock' | 'crypto'> = ['us_stock', 'tw_stock', 'crypto'];
+const CURRENCY_BUCKET_CLASS_SET = new Set<AssetClass>(['us_stock', 'tw_stock', 'crypto']);
+const CURRENCY_BUCKET_CLASSES = ASSET_CLASSES.filter((c) => CURRENCY_BUCKET_CLASS_SET.has(c)) as Array<
+  'us_stock' | 'tw_stock' | 'crypto'
+>;
 
 export function computeCurrencyBuckets(metrics: HoldingMetrics[]): CurrencyBucket[] {
   return CURRENCY_BUCKET_CLASSES.map((assetClass) => ({

@@ -12,7 +12,7 @@ export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
-  const { isSyncing: isAutoSyncing, error: autoSyncError, lastSyncedAt } = useAutoSync();
+  const { error: autoSyncError } = useAutoSync();
   const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
 
   const handleRefreshAll = async () => {
@@ -58,27 +58,7 @@ export function SettingsPanel() {
           </button>
         </div>
         {importError && <p className="form-error">{importError}</p>}
-
-        <div className="settings-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.autoSyncEnabled}
-              onChange={(e) => setSettings({ autoSyncEnabled: e.target.checked })}
-            />
-            自動同步（每 15 分鐘依代號合併一次，不會跳確認視窗）
-          </label>
-        </div>
-        {settings.autoSyncEnabled && (
-          <p className="settings-hint">
-            {isAutoSyncing
-              ? '同步中…'
-              : lastSyncedAt
-                ? `上次自動同步：${new Date(lastSyncedAt).toLocaleTimeString('zh-TW')}`
-                : '尚未同步'}
-          </p>
-        )}
-        {autoSyncError && <p className="form-error">{autoSyncError}</p>}
+        {autoSyncError && <p className="form-error">自動同步失敗：{autoSyncError}</p>}
 
         {pendingRows && (
           <div className="import-confirm">
@@ -156,16 +136,6 @@ export function SettingsPanel() {
             : `目前：1 USD = ${effectiveUsdToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
           {!canAutoFetchFx && '　需選擇 Twelve Data 並填入 API key 才能取得匯率。'}
         </p>
-        <div className="settings-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.fxAutoRefresh}
-              onChange={(e) => setSettings({ fxAutoRefresh: e.target.checked })}
-            />
-            自動抓匯率
-          </label>
-        </div>
         {fxError && <p className="form-error">{fxError}</p>}
       </div>
 

@@ -75,6 +75,10 @@ h3 {
   background: var(--card-bg);
 }
 
+.app-header-tabs {
+  margin: 10px 0 0;
+}
+
 .app-main {
   max-width: 1100px;
   width: 100%;

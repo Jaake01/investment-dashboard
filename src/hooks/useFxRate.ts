@@ -35,13 +35,13 @@ export function useFxRate() {
 
   useEffect(() => {
     if (hasAutoFetchedOnMount) return;
-    if (!settings.fxAutoRefresh || !canAutoFetch) return;
+    if (!canAutoFetch) return;
     const isStale = !fxRate || Date.now() - new Date(fxRate.updatedAt).getTime() > MIN_REFRESH_INTERVAL_MS;
     if (!isStale) return;
     hasAutoFetchedOnMount = true;
     refreshFxRate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.fxAutoRefresh, canAutoFetch]);
+  }, [canAutoFetch]);
 
   const effectiveUsdToTwd = fxRate?.usdToTwd ?? null;
   const updatedAt = fxRate?.updatedAt ?? null;

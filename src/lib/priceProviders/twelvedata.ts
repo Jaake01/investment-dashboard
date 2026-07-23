@@ -24,7 +24,14 @@ export async function fetchTwelveDataQuote(symbol: string, apiKey: string, asset
     throw new PriceFetchError(`${symbol}：無法連線到 Twelve Data`);
   }
   if (!response.ok) {
-    throw new PriceFetchError(`${symbol}：Twelve Data 回應錯誤（HTTP ${response.status}）`);
+    let detail = '';
+    try {
+      const errJson = (await response.clone().json()) as TwelveDataPriceResponse;
+      detail = errJson.message ?? '';
+    } catch {
+      detail = await response.text().catch(() => '');
+    }
+    throw new PriceFetchError(`${symbol}：Twelve Data 回應錯誤（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`);
   }
   const data = (await response.json()) as TwelveDataPriceResponse;
   if (!data.price) {

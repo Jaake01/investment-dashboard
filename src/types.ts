@@ -46,8 +46,6 @@ export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
   apiKey: string;
-  fxAutoRefresh: boolean;
-  autoSyncEnabled: boolean;
 }
 
 export interface PriceEntry {

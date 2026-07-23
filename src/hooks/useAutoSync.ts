@@ -30,7 +30,7 @@ export function useAutoSync() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (!settings.autoSyncEnabled || !settings.sheetUrl.trim()) {
+    if (!settings.sheetUrl.trim()) {
       return;
     }
 
@@ -45,7 +45,7 @@ export function useAutoSync() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.autoSyncEnabled, settings.sheetUrl]);
+  }, [settings.sheetUrl]);
 
   return { isSyncing, error, lastSyncedAt };
 }

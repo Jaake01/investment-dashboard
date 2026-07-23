@@ -17,8 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   sheetUrl: DEFAULT_SHEET_URL,
   priceProvider: 'none',
   apiKey: '',
-  fxAutoRefresh: true,
-  autoSyncEnabled: true,
+  twQuoteSheetUrl: '',
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

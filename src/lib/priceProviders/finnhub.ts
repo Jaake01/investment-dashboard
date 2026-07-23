@@ -18,7 +18,8 @@ export async function fetchFinnhubQuote(symbol: string, apiKey: string): Promise
     throw new PriceFetchError(`${symbol}：無法連線到 Finnhub`);
   }
   if (!response.ok) {
-    throw new PriceFetchError(`${symbol}：Finnhub 回應錯誤（HTTP ${response.status}）`);
+    const detail = await response.text().catch(() => '');
+    throw new PriceFetchError(`${symbol}：Finnhub 回應錯誤（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`);
   }
   const data = (await response.json()) as FinnhubQuoteResponse;
   if (!data || typeof data.c !== 'number' || data.c === 0) {

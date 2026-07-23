@@ -13,6 +13,7 @@ import {
   type AllocationSlice,
 } from '../lib/calculations';
 import { formatCurrencyIn, formatPercent } from '../lib/format';
+import { monogramColorFor, monogramFor, realIconUrlFor } from '../lib/icons';
 import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
 
 // Fixed per-class colors so a block's color always identifies the same asset
@@ -27,6 +28,12 @@ const CLASS_COLORS: Record<AssetClass, string> = {
 
 const DRILL_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 
+interface TreemapIcon {
+  iconUrl: string | null;
+  monogram: string;
+  monogramColor: string;
+}
+
 interface TreemapDatum {
   name: string;
   value: number;
@@ -34,6 +41,7 @@ interface TreemapDatum {
   percentLabel: string;
   percent: number;
   changePct: number | null;
+  icon: TreemapIcon | null;
   [key: string]: unknown;
 }
 
@@ -41,6 +49,7 @@ function toTreemapData(
   slices: AllocationSlice[],
   colorFor: (key: string, index: number) => string,
   changeFor: (key: string) => number | null,
+  iconFor: (key: string) => TreemapIcon | null,
 ): TreemapDatum[] {
   const total = slices.reduce((sum, s) => sum + s.value, 0);
   return slices.map((s, i) => {
@@ -52,6 +61,7 @@ function toTreemapData(
       percentLabel: `${percent.toFixed(1)}%`,
       percent,
       changePct: changeFor(s.key),
+      icon: iconFor(s.key),
     };
   });
 }
@@ -83,8 +93,15 @@ function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: nu
 const CHANGE_UP_COLOR = '#ef4444';
 const CHANGE_DOWN_COLOR = '#22c55e';
 
+// Below this, a block is too small for an icon badge to read as anything
+// but noise — falls back to text-only, same as before icons existed.
+const MIN_CELL_SIZE_FOR_ICON = 70;
+const MIN_ICON_SIZE = 22;
+const MAX_ICON_SIZE = 44;
+const ICON_GAP = 6;
+
 function TreemapCell(props: any) {
-  const { x, y, width, height, name, fill, percentLabel, percent, changePct } = props;
+  const { x, y, width, height, name, fill, percentLabel, percent, changePct, icon } = props;
   const maxTextWidth = width - LABEL_PADDING * 2;
 
   // Desired size scales with the block's share of the total (bigger slice ->
@@ -99,25 +116,62 @@ function TreemapCell(props: any) {
   const changeFontSize =
     changeLabel && percentFontSize > 0 ? fitFontSize(changeLabel, Math.max(MIN_FONT_SIZE, percentFontSize - 1), maxTextWidth, 700) : 0;
 
+  const iconSize =
+    icon && Math.min(width, height) >= MIN_CELL_SIZE_FOR_ICON
+      ? Math.min(MAX_ICON_SIZE, Math.max(MIN_ICON_SIZE, Math.min(width, height) * 0.32))
+      : 0;
+
   const lineGap = 2;
   const showPercent = percentFontSize > 0 && height > nameFontSize + percentFontSize + lineGap + LABEL_PADDING;
   const showChange = showPercent && changeFontSize > 0 && height > nameFontSize + percentFontSize + changeFontSize + lineGap * 2 + LABEL_PADDING;
   const showName = nameFontSize > 0 && height > nameFontSize + LABEL_PADDING;
+  const showIcon = showName && iconSize > 0 && height > iconSize + ICON_GAP + nameFontSize + LABEL_PADDING;
 
   const centerX = x + width / 2;
   const centerY = y + height / 2;
   const contentHeight =
-    nameFontSize + (showPercent ? percentFontSize + lineGap : 0) + (showChange ? changeFontSize + lineGap : 0);
+    (showIcon ? iconSize + ICON_GAP : 0) +
+    nameFontSize +
+    (showPercent ? percentFontSize + lineGap : 0) +
+    (showChange ? changeFontSize + lineGap : 0);
   const topY = centerY - contentHeight / 2;
-  const nameY = topY + nameFontSize / 2;
-  const percentY = topY + nameFontSize + lineGap + percentFontSize / 2;
-  const changeY = topY + nameFontSize + lineGap + percentFontSize + lineGap + changeFontSize / 2;
+  const iconCy = topY + iconSize / 2;
+  const nameY = topY + (showIcon ? iconSize + ICON_GAP : 0) + nameFontSize / 2;
+  const percentY = nameY + nameFontSize / 2 + lineGap + percentFontSize / 2;
+  const changeY = percentY + percentFontSize / 2 + lineGap + changeFontSize / 2;
 
   const changePillWidth = showChange ? measureTextWidth(changeLabel!, changeFontSize, 700) + 10 : 0;
+  const clipId = `treemap-icon-clip-${Math.round(x)}-${Math.round(y)}`;
 
   return (
     <g>
       <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
+      {showIcon && (
+        <>
+          <circle cx={centerX} cy={iconCy} r={iconSize / 2} fill={icon.monogramColor} />
+          <text x={centerX} y={iconCy} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={iconSize * 0.4} fontWeight={700}>
+            {icon.monogram}
+          </text>
+          {icon.iconUrl && (
+            <>
+              <clipPath id={clipId}>
+                <circle cx={centerX} cy={iconCy} r={iconSize / 2} />
+              </clipPath>
+              <image
+                x={centerX - iconSize / 2}
+                y={iconCy - iconSize / 2}
+                width={iconSize}
+                height={iconSize}
+                href={icon.iconUrl}
+                clipPath={`url(#${clipId})`}
+                onError={(e) => {
+                  (e.currentTarget as SVGImageElement).style.display = 'none';
+                }}
+              />
+            </>
+          )}
+        </>
+      )}
       {showName && (
         <text x={centerX} y={nameY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={nameFontSize} fontWeight={600}>
           {name}
@@ -170,6 +224,15 @@ export function AllocationTreemap() {
           if (!slice) return null;
           return computeDayChangePct(slice.value, computePreviousSymbolValue(snapshots, symbol));
         },
+        (key) => {
+          const symbol = drillMetrics.find((m) => m.holding.id === key)?.holding.symbol;
+          if (!symbol) return null;
+          return {
+            iconUrl: realIconUrlFor(symbol, selectedClass),
+            monogram: monogramFor(symbol),
+            monogramColor: monogramColorFor(symbol),
+          };
+        },
       )
     : toTreemapData(
         topLevel,
@@ -179,6 +242,7 @@ export function AllocationTreemap() {
           const todayValue = classValuesToday[assetClass] ?? 0;
           return computeDayChangePct(todayValue, computePreviousClassValue(snapshots, assetClass));
         },
+        () => null,
       );
 
   const isEmpty = data.length === 0;

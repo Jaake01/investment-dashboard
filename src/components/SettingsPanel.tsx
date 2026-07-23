@@ -12,7 +12,7 @@ export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
-  const { isSyncing: isAutoSyncing, error: autoSyncError, lastSyncedAt } = useAutoSync();
+  const { error: autoSyncError } = useAutoSync();
   const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
 
   const handleRefreshAll = async () => {
@@ -58,27 +58,7 @@ export function SettingsPanel() {
           </button>
         </div>
         {importError && <p className="form-error">{importError}</p>}
-
-        <div className="settings-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.autoSyncEnabled}
-              onChange={(e) => setSettings({ autoSyncEnabled: e.target.checked })}
-            />
-            自動同步（每 15 分鐘依代號合併一次，不會跳確認視窗）
-          </label>
-        </div>
-        {settings.autoSyncEnabled && (
-          <p className="settings-hint">
-            {isAutoSyncing
-              ? '同步中…'
-              : lastSyncedAt
-                ? `上次自動同步：${new Date(lastSyncedAt).toLocaleTimeString('zh-TW')}`
-                : '尚未同步'}
-          </p>
-        )}
-        {autoSyncError && <p className="form-error">{autoSyncError}</p>}
+        {autoSyncError && <p className="form-error">自動同步失敗：{autoSyncError}</p>}
 
         {pendingRows && (
           <div className="import-confirm">
@@ -149,6 +129,24 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
+        <h3>台股報價（GOOGLEFINANCE，選填）</h3>
+        <p className="settings-hint">
+          Finnhub／Twelve Data 的免費方案都不保證能查到台股（TWSE）即時報價。這裡改用 Google Sheet 的 GOOGLEFINANCE
+          當免費資料來源：在你的 Google Sheet 新增一個分頁，A 欄放代號（例如 2330），標題列打「symbol」；B 欄公式打
+          =GOOGLEFINANCE("TPE:"&A2,"price")，標題列打「price」。接著「檔案 → 共用 → 發布到網路」，只選這個分頁、格式選
+          CSV，把產生的網址貼在下方。設定後，台股報價一律優先從這裡讀取。
+        </p>
+        <div className="settings-row">
+          <input
+            type="text"
+            placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+            value={settings.twQuoteSheetUrl}
+            onChange={(e) => setSettings({ twQuoteSheetUrl: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="settings-group">
         <h3>匯率（美元/台幣）</h3>
         <p className="settings-hint">
           {effectiveUsdToTwd === null
@@ -156,16 +154,6 @@ export function SettingsPanel() {
             : `目前：1 USD = ${effectiveUsdToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
           {!canAutoFetchFx && '　需選擇 Twelve Data 並填入 API key 才能取得匯率。'}
         </p>
-        <div className="settings-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={settings.fxAutoRefresh}
-              onChange={(e) => setSettings({ fxAutoRefresh: e.target.checked })}
-            />
-            自動抓匯率
-          </label>
-        </div>
         {fxError && <p className="form-error">{fxError}</p>}
       </div>
 

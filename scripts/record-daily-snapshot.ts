@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fetchAndParseSheet } from '../src/lib/csv';
 import { fetchTwelveDataQuote } from '../src/lib/priceProviders/twelvedata';
+import { fetchQuoteSheet } from '../src/lib/quoteSheet';
 import {
   computeClassValues,
   computeHoldingMetrics,
@@ -19,6 +20,7 @@ import { DEFAULT_SHEET_URL } from '../src/lib/config';
 import type { Holding, PriceEntry, Snapshot } from '../src/types';
 
 const SHEET_URL = process.env.SNAPSHOT_SHEET_URL?.trim() || DEFAULT_SHEET_URL;
+const TW_QUOTE_SHEET_URL = process.env.SNAPSHOT_TW_QUOTE_SHEET_URL?.trim();
 const API_KEY = process.env.TWELVEDATA_API_KEY?.trim();
 const OUTPUT_PATH = fileURLToPath(new URL('../public/snapshots.json', import.meta.url));
 // Twelve Data's free tier rate limit — matches the delay usePrices.ts uses in the browser.
@@ -48,8 +50,30 @@ async function main() {
   const prices: Record<string, PriceEntry> = {};
   const symbols = Array.from(new Set(holdings.map((h) => h.symbol.trim()).filter(Boolean)));
 
-  for (let i = 0; i < symbols.length; i++) {
-    const symbol = symbols[i];
+  // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for
+  // tw_stock holdings — Twelve Data's free tier doesn't reliably cover
+  // TWSE. Mirrors the same fallback usePrices.ts uses in the browser.
+  let twQuotes: Record<string, number> = {};
+  if (TW_QUOTE_SHEET_URL) {
+    try {
+      twQuotes = await fetchQuoteSheet(TW_QUOTE_SHEET_URL);
+    } catch (err) {
+      console.error('TW quote sheet fetch failed:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  const remainingSymbols: string[] = [];
+  for (const symbol of symbols) {
+    const holding = holdings.find((h) => h.symbol.trim() === symbol);
+    if (holding?.assetClass === 'tw_stock' && twQuotes[symbol] !== undefined) {
+      prices[symbol] = { symbol, price: twQuotes[symbol], updatedAt: new Date().toISOString() };
+    } else {
+      remainingSymbols.push(symbol);
+    }
+  }
+
+  for (let i = 0; i < remainingSymbols.length; i++) {
+    const symbol = remainingSymbols[i];
     const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
     try {
       const price = await fetchTwelveDataQuote(symbol, API_KEY, assetClass);
@@ -57,12 +81,12 @@ async function main() {
     } catch (err) {
       console.error(`quote failed for ${symbol}:`, err instanceof Error ? err.message : err);
     }
-    if (i < symbols.length - 1) await sleep(QUOTE_DELAY_MS);
+    if (i < remainingSymbols.length - 1) await sleep(QUOTE_DELAY_MS);
   }
 
   let usdToTwd: number | null = null;
   try {
-    if (symbols.length > 0) await sleep(QUOTE_DELAY_MS);
+    if (remainingSymbols.length > 0) await sleep(QUOTE_DELAY_MS);
     usdToTwd = await fetchTwelveDataQuote('USD/TWD', API_KEY);
   } catch (err) {
     console.error('FX fetch failed:', err instanceof Error ? err.message : err);

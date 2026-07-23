@@ -46,8 +46,10 @@ export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
   apiKey: string;
-  fxAutoRefresh: boolean;
-  autoSyncEnabled: boolean;
+  // Optional: CSV published from a Google Sheet tab using GOOGLEFINANCE, for
+  // TW stock quotes — Finnhub/Twelve Data's free tiers don't reliably cover
+  // TWSE. Takes priority over priceProvider for tw_stock holdings.
+  twQuoteSheetUrl: string;
 }
 
 export interface PriceEntry {

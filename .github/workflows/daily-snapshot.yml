@@ -38,6 +38,11 @@ jobs:
         run: npx tsx scripts/record-daily-snapshot.ts
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          # Optional repo variable (Settings -> Secrets and variables -> Actions -> Variables) —
+          # published CSV URL for the GOOGLEFINANCE-based TW quote sheet described in the
+          # Settings tab of the app. Not a secret: it's the same kind of public "publish to
+          # web" CSV URL as SNAPSHOT_SHEET_URL.
+          SNAPSHOT_TW_QUOTE_SHEET_URL: ${{ vars.SNAPSHOT_TW_QUOTE_SHEET_URL }}
 
       - name: Publish snapshots.json to the data branch
         run: |

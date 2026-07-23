@@ -1,3 +1,4 @@
+import type { AssetClass } from '../../types';
 import { PriceFetchError } from './errors';
 
 interface FinnhubQuoteResponse {
@@ -9,7 +10,13 @@ interface FinnhubQuoteResponse {
   t: number;
 }
 
-export async function fetchFinnhubQuote(symbol: string, apiKey: string): Promise<number> {
+export async function fetchFinnhubQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number> {
+  if (assetClass === 'crypto') {
+    // Finnhub's /quote endpoint has no crypto pair support — a bare ticker
+    // like "BTC" can silently match an unrelated stock instead of failing,
+    // which is why crypto prices looked wrong rather than just missing.
+    throw new PriceFetchError(`${symbol}：Finnhub 不支援加密貨幣報價，請改用 Twelve Data`);
+  }
   const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(apiKey)}`;
   let response: Response;
   try {

@@ -15,9 +15,9 @@ export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
 export type Currency = 'USD' | 'TWD' | 'USDC';
 
 export const CURRENCY_LABELS: Record<Currency, string> = {
-  USD: '美元 (USD)',
-  TWD: '台幣 (TWD)',
-  USDC: 'USDC',
+  USD: 'USD',
+  TWD: 'TWD',
+  USDC: 'U',
 };
 
 // USDC is a USD-pegged stablecoin, treated as 1:1 with USD for conversion purposes.

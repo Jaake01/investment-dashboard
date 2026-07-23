@@ -2,6 +2,7 @@ import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeCurrencyBuckets, computeHoldingMetrics, computeTotalInTwd } from '../lib/calculations';
 import { formatCurrencyIn } from '../lib/format';
+import { CURRENCY_LABELS } from '../types';
 
 export function CurrencyBreakdown() {
   const { holdings, prices } = usePortfolio();
@@ -17,7 +18,7 @@ export function CurrencyBreakdown() {
       <div className="summary-grid">
         {buckets.map((bucket) => (
           <div className="summary-stat" key={bucket.assetClass}>
-            <span className="summary-label">{bucket.label}（{bucket.currency}）</span>
+            <span className="summary-label">{bucket.label}（{CURRENCY_LABELS[bucket.currency]}）</span>
             <span className="summary-value">{formatCurrencyIn(bucket.nativeTotal, bucket.currency)}</span>
           </div>
         ))}

@@ -26,7 +26,7 @@ export function formatCurrency(value: number): string {
 
 export function formatCurrencyIn(value: number, currency: Currency): string {
   if (currency === 'TWD') return twdFormatter.format(value);
-  if (currency === 'USDC') return `${usdcNumberFormatter.format(value)} USDC`;
+  if (currency === 'USDC') return `${usdcNumberFormatter.format(value)} U`;
   return currencyFormatter.format(value);
 }
 

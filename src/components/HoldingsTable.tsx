@@ -64,10 +64,9 @@ export function HoldingsTable() {
             <thead>
               <tr>
                 <th>代號</th>
-                <th>類別</th>
-                <th>股數</th>
-                <th>平均成本</th>
                 <th>現價</th>
+                <th>數量</th>
+                <th>平均成本</th>
                 <th>市值</th>
                 <th>損益</th>
                 <th>損益率</th>
@@ -81,13 +80,12 @@ export function HoldingsTable() {
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
-                    <td>{ASSET_CLASS_LABELS[m.holding.assetClass]}</td>
-                    <td>{formatNumber(m.holding.shares)}</td>
-                    <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>
                     <td>
                       {formatCurrencyIn(m.currentPrice, currency)}
                       {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
                     </td>
+                    <td>{formatNumber(m.holding.shares)}</td>
+                    <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>
                     <td>{formatCurrencyIn(m.marketValue, currency)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatCurrencyIn(m.gainLoss, currency)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>

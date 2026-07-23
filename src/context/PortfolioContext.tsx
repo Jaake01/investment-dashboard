@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   sheetUrl: DEFAULT_SHEET_URL,
   priceProvider: 'none',
   apiKey: '',
+  twQuoteSheetUrl: '',
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

@@ -129,6 +129,24 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
+        <h3>台股報價（GOOGLEFINANCE，選填）</h3>
+        <p className="settings-hint">
+          Finnhub／Twelve Data 的免費方案都不保證能查到台股（TWSE）即時報價。這裡改用 Google Sheet 的 GOOGLEFINANCE
+          當免費資料來源：在你的 Google Sheet 新增一個分頁，A 欄放代號（例如 2330），標題列打「symbol」；B 欄公式打
+          =GOOGLEFINANCE("TPE:"&A2,"price")，標題列打「price」。接著「檔案 → 共用 → 發布到網路」，只選這個分頁、格式選
+          CSV，把產生的網址貼在下方。設定後，台股報價一律優先從這裡讀取。
+        </p>
+        <div className="settings-row">
+          <input
+            type="text"
+            placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+            value={settings.twQuoteSheetUrl}
+            onChange={(e) => setSettings({ twQuoteSheetUrl: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="settings-group">
         <h3>匯率（美元/台幣）</h3>
         <p className="settings-hint">
           {effectiveUsdToTwd === null

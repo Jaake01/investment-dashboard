@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
 import { computeClassValues, computeHoldingMetrics, computeSymbolValues, computeTotalInTwd } from '../lib/calculations';
+import { CsvImportError } from '../lib/csv';
+import { fetchQuoteSheet } from '../lib/quoteSheet';
 import { useFxRate } from './useFxRate';
 import type { PriceEntry } from '../types';
 
@@ -22,18 +24,8 @@ export function usePrices() {
   const [errors, setErrors] = useState<string[]>([]);
 
   const refreshPrices = async () => {
-    const provider = getProvider(settings.priceProvider);
-    if (!provider) {
-      setErrors(['請先在設定中選擇報價來源']);
-      return;
-    }
-    if (!settings.apiKey.trim()) {
-      setErrors(['請先在設定中輸入 API key']);
-      return;
-    }
-
     const now = Date.now();
-    const symbols = Array.from(
+    const staleSymbols = Array.from(
       new Set(
         holdings
           .map((h) => h.symbol.trim())
@@ -46,7 +38,7 @@ export function usePrices() {
       ),
     );
 
-    if (symbols.length === 0) {
+    if (staleSymbols.length === 0) {
       setErrors([]);
       return;
     }
@@ -55,19 +47,48 @@ export function usePrices() {
     setErrors([]);
     const fetchedEntries: PriceEntry[] = [];
     const fetchErrors: string[] = [];
-    const delay = REQUEST_DELAY_MS[provider.id] ?? 1000;
 
-    for (let i = 0; i < symbols.length; i++) {
-      const symbol = symbols[i];
-      const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
+    // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for
+    // tw_stock holdings — Finnhub/Twelve Data's free tiers don't reliably
+    // cover TWSE. Anything it doesn't cover falls through to the provider.
+    let remainingSymbols = staleSymbols;
+    if (settings.twQuoteSheetUrl.trim()) {
       try {
-        const price = await provider.fetchQuote(symbol, settings.apiKey, assetClass);
-        fetchedEntries.push({ symbol, price, updatedAt: new Date().toISOString() });
+        const twQuotes = await fetchQuoteSheet(settings.twQuoteSheetUrl);
+        remainingSymbols = staleSymbols.filter((symbol) => {
+          const holding = holdings.find((h) => h.symbol.trim() === symbol);
+          if (holding?.assetClass === 'tw_stock' && twQuotes[symbol] !== undefined) {
+            fetchedEntries.push({ symbol, price: twQuotes[symbol], updatedAt: new Date().toISOString() });
+            return false;
+          }
+          return true;
+        });
       } catch (err) {
-        fetchErrors.push(err instanceof PriceFetchError ? err.message : `${symbol}：報價失敗`);
+        fetchErrors.push(err instanceof CsvImportError ? err.message : '台股報價 Sheet 讀取失敗');
       }
-      if (i < symbols.length - 1) {
-        await sleep(delay);
+    }
+
+    if (remainingSymbols.length > 0) {
+      const provider = getProvider(settings.priceProvider);
+      if (!provider) {
+        fetchErrors.push('請先在設定中選擇報價來源，或設定台股報價 Sheet');
+      } else if (!settings.apiKey.trim()) {
+        fetchErrors.push('請先在設定中輸入 API key');
+      } else {
+        const delay = REQUEST_DELAY_MS[provider.id] ?? 1000;
+        for (let i = 0; i < remainingSymbols.length; i++) {
+          const symbol = remainingSymbols[i];
+          const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
+          try {
+            const price = await provider.fetchQuote(symbol, settings.apiKey, assetClass);
+            fetchedEntries.push({ symbol, price, updatedAt: new Date().toISOString() });
+          } catch (err) {
+            fetchErrors.push(err instanceof PriceFetchError ? err.message : `${symbol}：報價失敗`);
+          }
+          if (i < remainingSymbols.length - 1) {
+            await sleep(delay);
+          }
+        }
       }
     }
 

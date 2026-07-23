@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
 import { computeClassValues, computeHoldingMetrics, computeSymbolValues, computeTotalInTwd } from '../lib/calculations';
@@ -16,6 +16,12 @@ const REQUEST_DELAY_MS: Record<string, number> = {
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// Module-scoped (not per-component) so it only auto-fetches once per page
+// load even though usePrices() is called from multiple places (Layout, for
+// the background behavior, and SettingsPanel, for the manual button) —
+// matches the pattern useFxRate/useRemoteSnapshots already use.
+let hasAutoFetchedOnMount = false;
 
 export function usePrices() {
   const { holdings, settings, prices, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
@@ -108,6 +114,17 @@ export function usePrices() {
     setErrors(fetchErrors);
     setIsRefreshing(false);
   };
+
+  useEffect(() => {
+    if (hasAutoFetchedOnMount) return;
+    const hasProvider = settings.priceProvider !== 'none' && settings.apiKey.trim().length > 0;
+    const hasTwSheet = settings.twQuoteSheetUrl.trim().length > 0;
+    if (!hasProvider && !hasTwSheet) return;
+    if (holdings.length === 0) return;
+    hasAutoFetchedOnMount = true;
+    refreshPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.priceProvider, settings.apiKey, settings.twQuoteSheetUrl, holdings.length]);
 
   return { refreshPrices, isRefreshing, errors };
 }

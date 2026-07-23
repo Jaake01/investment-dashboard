@@ -13,10 +13,22 @@ const EXCHANGE_FOR_ASSET_CLASS: Partial<Record<AssetClass, string>> = {
   tw_stock: 'TWSE',
 };
 
+// There's no bare "BTC" instrument — crypto has to be queried as a trading
+// pair (same "BASE/QUOTE" convention this app already uses for the USD/TWD
+// FX rate). A bare symbol either 404s or, worse, silently matches an
+// unrelated instrument that happens to share the ticker, which is why crypto
+// prices looked wrong before this. This app treats crypto as ~USD (USDC
+// 1:1), so pairing against USD gives the right price.
+function symbolForQuery(symbol: string, assetClass?: AssetClass): string {
+  if (assetClass === 'crypto' && !symbol.includes('/')) return `${symbol}/USD`;
+  return symbol;
+}
+
 export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number> {
   const exchange = assetClass ? EXCHANGE_FOR_ASSET_CLASS[assetClass] : undefined;
   const exchangeParam = exchange ? `&exchange=${encodeURIComponent(exchange)}` : '';
-  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(symbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
+  const querySymbol = symbolForQuery(symbol, assetClass);
+  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(querySymbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
   let response: Response;
   try {
     response = await fetch(url);

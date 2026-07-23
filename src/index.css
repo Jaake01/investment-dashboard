@@ -165,10 +165,16 @@ table {
   font-size: 14px;
 }
 
+.holdings-table {
+  table-layout: fixed;
+}
+
 th, td {
   text-align: right;
   padding: 8px 10px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-bottom: 1px solid var(--border);
 }
 
@@ -231,16 +237,11 @@ th {
   line-height: 1;
 }
 
-.row-menu {
-  position: relative;
-  display: inline-block;
-}
-
+/* .row-menu-dropdown is rendered via a portal into document.body (see
+   HoldingsTable) so it isn't clipped by .table-scroll's overflow, with
+   position/top/right set inline per-instance. */
 .row-menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 5;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   min-width: 96px;

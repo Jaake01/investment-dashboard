@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
 import { formatCurrencyIn, formatNumber, formatPercent } from '../lib/format';
@@ -7,24 +8,35 @@ import { HoldingFormModal } from './HoldingFormModal';
 
 const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 
+// Fixed pixel widths (used with table-layout: fixed) so columns don't
+// reshuffle as values change length — e.g. switching tabs between
+// currencies, or a price refresh changing digit count.
+const COLUMN_WIDTHS = ['70px', '110px', '90px', '100px', '110px', '100px', '80px', '50px'];
+
+interface OpenMenu {
+  id: string;
+  top: number;
+  right: number;
+}
+
 export function HoldingsTable() {
   const { holdings, prices, deleteHolding } = usePortfolio();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
   const [selectedClass, setSelectedClass] = useState<AssetClass>('us_stock');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!openMenuId) return;
+    if (!openMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuId(null);
+        setOpenMenu(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openMenuId]);
+  }, [openMenu]);
 
   const hasOther = holdings.some((h) => h.assetClass === 'other');
   const tabs = hasOther ? [...BASE_TABS, 'other' as AssetClass] : BASE_TABS;
@@ -60,7 +72,12 @@ export function HoldingsTable() {
         <p className="empty-state">「{ASSET_CLASS_LABELS[selectedClass]}」目前沒有持股。</p>
       ) : (
         <div className="table-scroll">
-          <table>
+          <table className="holdings-table">
+            <colgroup>
+              {COLUMN_WIDTHS.map((width, i) => (
+                <col key={i} style={{ width }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th>代號</th>
@@ -77,6 +94,7 @@ export function HoldingsTable() {
               {metrics.map((m) => {
                 const isGain = m.gainLoss >= 0;
                 const currency = CURRENCY_FOR_ASSET_CLASS[m.holding.assetClass];
+                const isMenuOpen = openMenu?.id === m.holding.id;
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
@@ -90,20 +108,35 @@ export function HoldingsTable() {
                     <td className={isGain ? 'gain' : 'loss'}>{formatCurrencyIn(m.gainLoss, currency)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
-                      <div className="row-menu" ref={openMenuId === m.holding.id ? menuRef : undefined}>
-                        <button
-                          className="btn btn-small btn-icon"
-                          aria-label="更多操作"
-                          onClick={() => setOpenMenuId(openMenuId === m.holding.id ? null : m.holding.id)}
-                        >
-                          ⋯
-                        </button>
-                        {openMenuId === m.holding.id && (
-                          <div className="row-menu-dropdown">
+                      <button
+                        className="btn btn-small btn-icon"
+                        aria-label="更多操作"
+                        onClick={(e) => {
+                          if (isMenuOpen) {
+                            setOpenMenu(null);
+                            return;
+                          }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setOpenMenu({
+                            id: m.holding.id,
+                            top: rect.bottom + 4,
+                            right: window.innerWidth - rect.right,
+                          });
+                        }}
+                      >
+                        ⋯
+                      </button>
+                      {isMenuOpen &&
+                        createPortal(
+                          <div
+                            className="row-menu-dropdown"
+                            ref={menuRef}
+                            style={{ position: 'fixed', top: openMenu.top, right: openMenu.right }}
+                          >
                             <button
                               onClick={() => {
                                 setEditingId(m.holding.id);
-                                setOpenMenuId(null);
+                                setOpenMenu(null);
                               }}
                             >
                               編輯
@@ -111,7 +144,7 @@ export function HoldingsTable() {
                             <button
                               className="danger"
                               onClick={() => {
-                                setOpenMenuId(null);
+                                setOpenMenu(null);
                                 if (window.confirm(`確定要刪除「${m.holding.symbol || '這筆持股'}」嗎？`)) {
                                   deleteHolding(m.holding.id);
                                 }
@@ -119,9 +152,9 @@ export function HoldingsTable() {
                             >
                               刪除
                             </button>
-                          </div>
+                          </div>,
+                          document.body,
                         )}
-                      </div>
                     </td>
                   </tr>
                 );

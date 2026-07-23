@@ -48,7 +48,12 @@ const PortfolioContext = createContext<PortfolioContextValue | null>(null);
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [holdings, setHoldings] = useLocalStorage<Holding[]>(storageKey('holdings'), []);
-  const [settings, setSettingsState] = useLocalStorage<Settings>(storageKey('settings'), DEFAULT_SETTINGS);
+  const [storedSettings, setSettingsState] = useLocalStorage<Settings>(storageKey('settings'), DEFAULT_SETTINGS);
+  // Merge with defaults on every read: localStorage may hold a Settings object
+  // saved by an older version of the app that's missing fields added since
+  // (e.g. twQuoteSheetUrl) — reading those as `undefined` instead of '' broke
+  // every `.trim()` call on them. This self-heals regardless of what's stored.
+  const settings = useMemo<Settings>(() => ({ ...DEFAULT_SETTINGS, ...storedSettings }), [storedSettings]);
   const [prices, setPrices] = useLocalStorage<Record<string, PriceEntry>>(storageKey('prices'), {});
   const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>(storageKey('snapshots'), []);
   const [fxRate, setFxRateState] = useLocalStorage<FxRate | null>(storageKey('fxRate'), null);

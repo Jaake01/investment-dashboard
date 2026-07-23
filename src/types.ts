@@ -1,6 +1,8 @@
 export type AssetClass = 'us_stock' | 'tw_stock' | 'crypto' | 'cash' | 'other';
 
-export const ASSET_CLASSES: AssetClass[] = ['us_stock', 'tw_stock', 'crypto', 'cash', 'other'];
+// Canonical display order used everywhere asset classes are listed (tabs,
+// treemap blocks, dropdowns): crypto, us_stock, tw_stock, cash, other.
+export const ASSET_CLASSES: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash', 'other'];
 
 export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
   us_stock: '美股',
@@ -44,9 +46,7 @@ export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
   apiKey: string;
-  allocationGroupBy: 'holding' | 'assetClass';
   fxAutoRefresh: boolean;
-  manualUsdTwdRate: number;
   autoSyncEnabled: boolean;
 }
 
@@ -59,12 +59,14 @@ export interface PriceEntry {
 export interface FxRate {
   usdToTwd: number;
   updatedAt: string;
-  source: 'auto' | 'manual';
+  source: 'auto';
 }
 
 export interface Snapshot {
   date: string;
-  totalValue: number;
+  totalValue: number; // TWD, whole-portfolio (used by the trend chart)
+  classValues?: Partial<Record<AssetClass, number>>; // native currency, per asset class
+  symbolValues?: Record<string, number>; // native currency, per holding symbol
 }
 
 export interface ImportedHoldingRow {

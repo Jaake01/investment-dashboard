@@ -1,5 +1,5 @@
-import type { AssetClass, Currency, Holding, PriceEntry } from '../types';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS } from '../types';
+import type { AssetClass, Currency, Holding, PriceEntry, Snapshot } from '../types';
+import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS } from '../types';
 
 export interface HoldingMetrics {
   holding: Holding;
@@ -64,11 +64,104 @@ export function computeAllocation(
       map.set(key, { key, label, value });
     }
   }
+  const slices = Array.from(map.values());
+  if (groupBy === 'assetClass') {
+    // Fixed canonical order (crypto, us_stock, tw_stock, cash, other) rather
+    // than sorting by value, so a class's position doesn't jump around as
+    // its value changes relative to the others.
+    return slices.sort((a, b) => ASSET_CLASSES.indexOf(a.key as AssetClass) - ASSET_CLASSES.indexOf(b.key as AssetClass));
+  }
+  return slices.sort((a, b) => b.value - a.value);
+}
+
+// For drilling into a single asset class: every holding here already shares
+// the same native currency, so this skips TWD conversion (unlike
+// computeAllocation) and keeps values in that class's native currency.
+export function computeHoldingsWithinClass(metrics: HoldingMetrics[]): AllocationSlice[] {
+  const map = new Map<string, AllocationSlice>();
+  for (const m of metrics) {
+    if (m.marketValue <= 0) continue;
+    const key = m.holding.id;
+    const label = m.holding.symbol || m.holding.name || '未命名';
+    const existing = map.get(key);
+    if (existing) {
+      existing.value += m.marketValue;
+    } else {
+      map.set(key, { key, label, value: m.marketValue });
+    }
+  }
   return Array.from(map.values()).sort((a, b) => b.value - a.value);
 }
 
 export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Most recent recorded snapshot strictly before today, i.e. "yesterday" (or
+// the last day a snapshot exists, if the app wasn't opened every day). Null
+// if there's no snapshot history yet to compare against.
+export function computePreviousSnapshotValue(snapshots: Snapshot[], today: string = todayDateString()): number | null {
+  const past = snapshots.filter((s) => s.date < today).sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].totalValue : null;
+}
+
+// Native-currency totals per asset class, for recording into a snapshot.
+export function computeClassValues(metrics: HoldingMetrics[]): Partial<Record<AssetClass, number>> {
+  const map: Partial<Record<AssetClass, number>> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0) continue;
+    map[m.holding.assetClass] = (map[m.holding.assetClass] ?? 0) + m.marketValue;
+  }
+  return map;
+}
+
+// Native-currency totals per holding symbol, for recording into a snapshot.
+export function computeSymbolValues(metrics: HoldingMetrics[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0 || !m.holding.symbol) continue;
+    map[m.holding.symbol] = (map[m.holding.symbol] ?? 0) + m.marketValue;
+  }
+  return map;
+}
+
+export function computePreviousClassValue(
+  snapshots: Snapshot[],
+  assetClass: AssetClass,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.classValues?.[assetClass] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].classValues![assetClass]! : null;
+}
+
+export function computePreviousSymbolValue(
+  snapshots: Snapshot[],
+  symbol: string,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.symbolValues?.[symbol] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].symbolValues![symbol]! : null;
+}
+
+// null if there's no previous value to compare against, or it was zero.
+export function computeDayChangePct(currentValue: number, previousValue: number | null): number | null {
+  if (previousValue === null || previousValue === 0) return null;
+  return ((currentValue - previousValue) / previousValue) * 100;
+}
+
+// Merges the daily-automated history (fetched from the "data" branch, see
+// useRemoteSnapshots) with locally recorded snapshots. Local wins on a date
+// collision, since a manual "刷新報價" click is a more deliberate record
+// than the scheduled run for that same day.
+export function mergeSnapshots(local: Snapshot[], remote: Snapshot[]): Snapshot[] {
+  const byDate = new Map<string, Snapshot>();
+  for (const s of remote) byDate.set(s.date, s);
+  for (const s of local) byDate.set(s.date, s);
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.
@@ -86,7 +179,10 @@ export interface CurrencyBucket {
   nativeTotal: number;
 }
 
-const CURRENCY_BUCKET_CLASSES: Array<'us_stock' | 'tw_stock' | 'crypto'> = ['us_stock', 'tw_stock', 'crypto'];
+const CURRENCY_BUCKET_CLASS_SET = new Set<AssetClass>(['us_stock', 'tw_stock', 'crypto']);
+const CURRENCY_BUCKET_CLASSES = ASSET_CLASSES.filter((c) => CURRENCY_BUCKET_CLASS_SET.has(c)) as Array<
+  'us_stock' | 'tw_stock' | 'crypto'
+>;
 
 export function computeCurrencyBuckets(metrics: HoldingMetrics[]): CurrencyBucket[] {
   return CURRENCY_BUCKET_CLASSES.map((assetClass) => ({

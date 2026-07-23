@@ -1,9 +1,11 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
+import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
 import { recordSnapshot } from '../hooks/useSnapshots';
+import { mergeSnapshots } from '../lib/calculations';
+import { DEFAULT_SHEET_URL } from '../lib/config';
 
 // Pre-filled with the owner's own published sheet so the dashboard connects
 // automatically on first load without requiring the URL to be pasted in
@@ -12,12 +14,10 @@ import { recordSnapshot } from '../hooks/useSnapshots';
 // bundle is visible to anyone who opens the deployed site regardless, so
 // there's no meaningful confidentiality being traded away here.
 const DEFAULT_SETTINGS: Settings = {
-  sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBIuqXFPsT877PFN1HiRva1Uw1pKx681DQJcMSEUymzTdIrKjRyNSmurR-QQ33NFJbw0qE9Auacr7W/pub?output=csv',
+  sheetUrl: DEFAULT_SHEET_URL,
   priceProvider: 'none',
   apiKey: '',
-  allocationGroupBy: 'holding',
   fxAutoRefresh: true,
-  manualUsdTwdRate: 0,
   autoSyncEnabled: true,
 };
 
@@ -36,7 +36,12 @@ interface PortfolioContextValue {
   mergeHoldingsFromImport: (rows: ImportedHoldingRow[]) => void;
   setSettings: (patch: Partial<Settings>) => void;
   applyPriceUpdates: (entries: PriceEntry[]) => void;
-  recordCurrentSnapshot: (totalValue: number) => void;
+  recordCurrentSnapshot: (
+    totalValue: number,
+    classValues: Partial<Record<AssetClass, number>>,
+    symbolValues: Record<string, number>,
+  ) => void;
+  mergeRemoteSnapshots: (remote: Snapshot[]) => void;
   setFxRate: (rate: FxRate) => void;
 }
 
@@ -121,8 +126,12 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setPrices(next);
     },
 
-    recordCurrentSnapshot: (totalValue) => {
-      setSnapshots(recordSnapshot(snapshots, totalValue));
+    recordCurrentSnapshot: (totalValue, classValues, symbolValues) => {
+      setSnapshots(recordSnapshot(snapshots, totalValue, classValues, symbolValues));
+    },
+
+    mergeRemoteSnapshots: (remote) => {
+      setSnapshots(mergeSnapshots(snapshots, remote));
     },
 
     setFxRate: (rate) => {

@@ -1,0 +1,51 @@
+name: Record Daily Snapshot
+
+on:
+  schedule:
+    # 22:00 UTC — after both the US market close (~20:00-21:00 UTC) and the
+    # Taiwan market close (05:30 UTC, earlier the same UTC calendar day), so
+    # both markets' snapshot lands under the same date label.
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-snapshot
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Seed existing snapshot history from the data branch
+        run: |
+          mkdir -p public
+          curl -sf "https://raw.githubusercontent.com/${{ github.repository }}/data/snapshots.json" \
+            -o public/snapshots.json || echo '[]' > public/snapshots.json
+
+      - name: Fetch quotes and append today's snapshot
+        run: npx tsx scripts/record-daily-snapshot.ts
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+
+      - name: Publish snapshots.json to the data branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan data-publish
+          git rm -rf --cached . > /dev/null
+          mv public/snapshots.json ./snapshots.json
+          git add -f snapshots.json
+          git commit -m "chore: record daily snapshot ($(date -u +%F))"
+          git push origin data-publish:data --force

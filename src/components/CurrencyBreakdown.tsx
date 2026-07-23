@@ -5,7 +5,7 @@ import { formatCurrencyIn } from '../lib/format';
 
 export function CurrencyBreakdown() {
   const { holdings, prices } = usePortfolio();
-  const { effectiveUsdToTwd, effectiveSource } = useFxRate();
+  const { effectiveUsdToTwd } = useFxRate();
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
   const buckets = computeCurrencyBuckets(metrics);
@@ -29,13 +29,11 @@ export function CurrencyBreakdown() {
         </div>
       </div>
       {effectiveUsdToTwd !== null && (
-        <p className="settings-hint">
-          目前匯率：1 USD = {effectiveUsdToTwd} TWD（{effectiveSource === 'auto' ? '即時 API' : '手動輸入'}）
-        </p>
+        <p className="settings-hint">目前匯率：1 USD = {effectiveUsdToTwd} TWD（即時 API）</p>
       )}
       {effectiveUsdToTwd === null && (
         <p className="settings-hint">
-          尚未取得美元/台幣匯率，請到下方設定選擇 Twelve Data 自動抓匯率，或手動輸入。
+          尚未取得美元/台幣匯率，請到下方設定選擇 Twelve Data 並填入 API key。
         </p>
       )}
     </section>

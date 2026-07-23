@@ -1,11 +1,11 @@
-import type { PriceProviderId } from '../../types';
+import type { AssetClass, PriceProviderId } from '../../types';
 import { fetchFinnhubQuote } from './finnhub';
 import { fetchTwelveDataQuote } from './twelvedata';
 
 export interface ProviderAdapter {
   id: PriceProviderId;
   label: string;
-  fetchQuote(symbol: string, apiKey: string): Promise<number>;
+  fetchQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number>;
 }
 
 export { PriceFetchError } from './errors';

@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Scratch output of scripts/record-daily-snapshot.ts — the real published
+# copy lives on the "data" branch, never on main.
+public/snapshots.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

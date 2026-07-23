@@ -5,13 +5,15 @@ import { PRICE_PROVIDERS } from '../lib/priceProviders';
 import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import type { ImportedHoldingRow, PriceProviderId } from '../types';
 
 export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
-  const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, effectiveSource } = useFxRate();
+  const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
   const { isSyncing: isAutoSyncing, error: autoSyncError, lastSyncedAt } = useAutoSync();
+  const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
 
   const handleRefreshAll = async () => {
     await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve()]);
@@ -151,8 +153,8 @@ export function SettingsPanel() {
         <p className="settings-hint">
           {effectiveUsdToTwd === null
             ? '尚未取得匯率。'
-            : `目前：1 USD = ${effectiveUsdToTwd} TWD（${effectiveSource === 'auto' ? '即時 API' : '手動輸入'}）`}
-          {!canAutoFetchFx && '　自動抓匯率需選擇 Twelve Data 並填入 API key，否則只能用下方手動輸入。'}
+            : `目前：1 USD = ${effectiveUsdToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
+          {!canAutoFetchFx && '　需選擇 Twelve Data 並填入 API key 才能取得匯率。'}
         </p>
         <div className="settings-row">
           <label className="checkbox-label">
@@ -163,15 +165,21 @@ export function SettingsPanel() {
             />
             自動抓匯率
           </label>
-          <input
-            type="number"
-            step="any"
-            placeholder="手動輸入匯率，例如 32.5"
-            value={settings.manualUsdTwdRate || ''}
-            onChange={(e) => setSettings({ manualUsdTwdRate: Number(e.target.value) || 0 })}
-          />
         </div>
         {fxError && <p className="form-error">{fxError}</p>}
+      </div>
+
+      <div className="settings-group">
+        <h3>每日自動記錄</h3>
+        <p className="settings-hint">
+          GitHub Actions 每天會在背景自動記錄一次資產快照，不需要打開網站，讓「較昨日」跟持倉圖的漲跌%
+          即使好幾天沒開網站也能對比到正確的前一筆紀錄。
+          {remoteChecked
+            ? lastRemoteDate
+              ? `目前最新的自動記錄日期：${lastRemoteDate}。`
+              : '尚未取得自動記錄（可能還沒設定排程，或還沒有任何一次執行過）。'
+            : '讀取中…'}
+        </p>
       </div>
     </section>
   );

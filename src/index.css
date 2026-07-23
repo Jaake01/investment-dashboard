@@ -135,6 +135,15 @@ h3 {
   color: var(--loss);
 }
 
+/* Taiwan market convention (opposite of .gain/.loss above): up is red, down is green. */
+.change-up {
+  color: var(--loss);
+}
+
+.change-down {
+  color: var(--gain);
+}
+
 .empty-state {
   color: var(--text-muted);
   font-size: 14px;
@@ -278,10 +287,31 @@ th {
   border-color: var(--danger-hover);
 }
 
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 20px;
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tab-button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tab-button:hover {
+  border-color: var(--accent);
+}
+
+.tab-button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .settings-group {

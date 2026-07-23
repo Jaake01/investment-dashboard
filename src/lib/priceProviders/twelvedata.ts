@@ -1,3 +1,4 @@
+import type { AssetClass } from '../../types';
 import { PriceFetchError } from './errors';
 
 interface TwelveDataPriceResponse {
@@ -6,8 +7,16 @@ interface TwelveDataPriceResponse {
   message?: string;
 }
 
-export async function fetchTwelveDataQuote(symbol: string, apiKey: string): Promise<number> {
-  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`;
+// Plain tickers like "2330" collide across exchanges, so non-US symbols need
+// an explicit exchange hint or Twelve Data can't resolve which listing you mean.
+const EXCHANGE_FOR_ASSET_CLASS: Partial<Record<AssetClass, string>> = {
+  tw_stock: 'TWSE',
+};
+
+export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number> {
+  const exchange = assetClass ? EXCHANGE_FOR_ASSET_CLASS[assetClass] : undefined;
+  const exchangeParam = exchange ? `&exchange=${encodeURIComponent(exchange)}` : '';
+  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(symbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
   let response: Response;
   try {
     response = await fetch(url);

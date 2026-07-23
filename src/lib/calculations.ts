@@ -1,4 +1,4 @@
-import type { AssetClass, Currency, Holding, PriceEntry } from '../types';
+import type { AssetClass, Currency, Holding, PriceEntry, Snapshot } from '../types';
 import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS } from '../types';
 
 export interface HoldingMetrics {
@@ -95,6 +95,14 @@ export function computeHoldingsWithinClass(metrics: HoldingMetrics[]): Allocatio
 
 export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Most recent recorded snapshot strictly before today, i.e. "yesterday" (or
+// the last day a snapshot exists, if the app wasn't opened every day). Null
+// if there's no snapshot history yet to compare against.
+export function computePreviousSnapshotValue(snapshots: Snapshot[], today: string = todayDateString()): number | null {
+  const past = snapshots.filter((s) => s.date < today).sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].totalValue : null;
 }
 
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.

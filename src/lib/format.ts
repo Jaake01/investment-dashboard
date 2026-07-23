@@ -3,7 +3,7 @@ import type { Currency } from '../types';
 const currencyFormatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
   currency: 'USD',
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 });
 
 const twdFormatter = new Intl.NumberFormat('zh-TW', {
@@ -13,7 +13,7 @@ const twdFormatter = new Intl.NumberFormat('zh-TW', {
 });
 
 const usdcNumberFormatter = new Intl.NumberFormat('zh-TW', {
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 });
 
 const numberFormatter = new Intl.NumberFormat('zh-TW', {
@@ -36,5 +36,5 @@ export function formatNumber(value: number): string {
 
 export function formatPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
+  return `${sign}${value.toFixed(1)}%`;
 }

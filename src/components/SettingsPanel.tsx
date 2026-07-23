@@ -5,6 +5,7 @@ import { PRICE_PROVIDERS } from '../lib/priceProviders';
 import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import type { ImportedHoldingRow, PriceProviderId } from '../types';
 
 export function SettingsPanel() {
@@ -12,6 +13,7 @@ export function SettingsPanel() {
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
   const { isSyncing: isAutoSyncing, error: autoSyncError, lastSyncedAt } = useAutoSync();
+  const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
 
   const handleRefreshAll = async () => {
     await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve()]);
@@ -165,6 +167,19 @@ export function SettingsPanel() {
           </label>
         </div>
         {fxError && <p className="form-error">{fxError}</p>}
+      </div>
+
+      <div className="settings-group">
+        <h3>每日自動記錄</h3>
+        <p className="settings-hint">
+          GitHub Actions 每天會在背景自動記錄一次資產快照，不需要打開網站，讓「較昨日」跟持倉圖的漲跌%
+          即使好幾天沒開網站也能對比到正確的前一筆紀錄。
+          {remoteChecked
+            ? lastRemoteDate
+              ? `目前最新的自動記錄日期：${lastRemoteDate}。`
+              : '尚未取得自動記錄（可能還沒設定排程，或還沒有任何一次執行過）。'
+            : '讀取中…'}
+        </p>
       </div>
     </section>
   );

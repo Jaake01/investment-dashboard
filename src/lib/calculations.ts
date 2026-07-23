@@ -153,6 +153,17 @@ export function computeDayChangePct(currentValue: number, previousValue: number 
   return ((currentValue - previousValue) / previousValue) * 100;
 }
 
+// Merges the daily-automated history (fetched from the "data" branch, see
+// useRemoteSnapshots) with locally recorded snapshots. Local wins on a date
+// collision, since a manual "刷新報價" click is a more deliberate record
+// than the scheduled run for that same day.
+export function mergeSnapshots(local: Snapshot[], remote: Snapshot[]): Snapshot[] {
+  const byDate = new Map<string, Snapshot>();
+  for (const s of remote) byDate.set(s.date, s);
+  for (const s of local) byDate.set(s.date, s);
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.
 export function convertToTwd(nativeValue: number, assetClass: AssetClass, usdToTwd: number | null): number | null {
   const currency = CURRENCY_FOR_ASSET_CLASS[assetClass];

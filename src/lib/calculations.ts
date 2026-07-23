@@ -105,6 +105,54 @@ export function computePreviousSnapshotValue(snapshots: Snapshot[], today: strin
   return past.length > 0 ? past[0].totalValue : null;
 }
 
+// Native-currency totals per asset class, for recording into a snapshot.
+export function computeClassValues(metrics: HoldingMetrics[]): Partial<Record<AssetClass, number>> {
+  const map: Partial<Record<AssetClass, number>> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0) continue;
+    map[m.holding.assetClass] = (map[m.holding.assetClass] ?? 0) + m.marketValue;
+  }
+  return map;
+}
+
+// Native-currency totals per holding symbol, for recording into a snapshot.
+export function computeSymbolValues(metrics: HoldingMetrics[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0 || !m.holding.symbol) continue;
+    map[m.holding.symbol] = (map[m.holding.symbol] ?? 0) + m.marketValue;
+  }
+  return map;
+}
+
+export function computePreviousClassValue(
+  snapshots: Snapshot[],
+  assetClass: AssetClass,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.classValues?.[assetClass] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].classValues![assetClass]! : null;
+}
+
+export function computePreviousSymbolValue(
+  snapshots: Snapshot[],
+  symbol: string,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.symbolValues?.[symbol] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].symbolValues![symbol]! : null;
+}
+
+// null if there's no previous value to compare against, or it was zero.
+export function computeDayChangePct(currentValue: number, previousValue: number | null): number | null {
+  if (previousValue === null || previousValue === 0) return null;
+  return ((currentValue - previousValue) / previousValue) * 100;
+}
+
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.
 export function convertToTwd(nativeValue: number, assetClass: AssetClass, usdToTwd: number | null): number | null {
   const currency = CURRENCY_FOR_ASSET_CLASS[assetClass];

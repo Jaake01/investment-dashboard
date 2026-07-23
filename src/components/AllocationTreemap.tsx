@@ -2,8 +2,17 @@ import { useState } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
-import { computeAllocation, computeHoldingMetrics, computeHoldingsWithinClass, type AllocationSlice } from '../lib/calculations';
-import { formatCurrencyIn } from '../lib/format';
+import {
+  computeAllocation,
+  computeClassValues,
+  computeDayChangePct,
+  computeHoldingMetrics,
+  computeHoldingsWithinClass,
+  computePreviousClassValue,
+  computePreviousSymbolValue,
+  type AllocationSlice,
+} from '../lib/calculations';
+import { formatCurrencyIn, formatPercent } from '../lib/format';
 import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
 
 // Fixed per-class colors so a block's color always identifies the same asset
@@ -24,10 +33,15 @@ interface TreemapDatum {
   fill: string;
   percentLabel: string;
   percent: number;
+  changePct: number | null;
   [key: string]: unknown;
 }
 
-function toTreemapData(slices: AllocationSlice[], colorFor: (key: string, index: number) => string): TreemapDatum[] {
+function toTreemapData(
+  slices: AllocationSlice[],
+  colorFor: (key: string, index: number) => string,
+  changeFor: (key: string) => number | null,
+): TreemapDatum[] {
   const total = slices.reduce((sum, s) => sum + s.value, 0);
   return slices.map((s, i) => {
     const percent = total > 0 ? (s.value / total) * 100 : 0;
@@ -37,6 +51,7 @@ function toTreemapData(slices: AllocationSlice[], colorFor: (key: string, index:
       fill: colorFor(s.key, i),
       percentLabel: `${percent.toFixed(1)}%`,
       percent,
+      changePct: changeFor(s.key),
     };
   });
 }
@@ -64,8 +79,12 @@ function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: nu
   return 0;
 }
 
+// Taiwan market convention: up is red, down is green.
+const CHANGE_UP_COLOR = '#ef4444';
+const CHANGE_DOWN_COLOR = '#22c55e';
+
 function TreemapCell(props: any) {
-  const { x, y, width, height, name, fill, percentLabel, percent } = props;
+  const { x, y, width, height, name, fill, percentLabel, percent, changePct } = props;
   const maxTextWidth = width - LABEL_PADDING * 2;
 
   // Desired size scales with the block's share of the total (bigger slice ->
@@ -75,14 +94,26 @@ function TreemapCell(props: any) {
   const nameFontSize = fitFontSize(name, desiredNameSize, maxTextWidth, 600);
   const percentFontSize = nameFontSize > 0 ? fitFontSize(percentLabel, Math.round(nameFontSize * 0.75), maxTextWidth, 400) : 0;
 
+  const changeLabel = changePct === null || changePct === undefined ? null : formatPercent(changePct);
+  const changeColor = changePct === null || changePct === undefined ? null : changePct > 0 ? CHANGE_UP_COLOR : changePct < 0 ? CHANGE_DOWN_COLOR : '#fff';
+  const changeFontSize =
+    changeLabel && percentFontSize > 0 ? fitFontSize(changeLabel, Math.max(MIN_FONT_SIZE, percentFontSize - 1), maxTextWidth, 700) : 0;
+
   const lineGap = 2;
   const showPercent = percentFontSize > 0 && height > nameFontSize + percentFontSize + lineGap + LABEL_PADDING;
+  const showChange = showPercent && changeFontSize > 0 && height > nameFontSize + percentFontSize + changeFontSize + lineGap * 2 + LABEL_PADDING;
   const showName = nameFontSize > 0 && height > nameFontSize + LABEL_PADDING;
 
   const centerX = x + width / 2;
   const centerY = y + height / 2;
-  const nameY = showPercent ? centerY - (percentFontSize + lineGap) / 2 : centerY;
-  const percentY = centerY + (nameFontSize + lineGap) / 2;
+  const contentHeight =
+    nameFontSize + (showPercent ? percentFontSize + lineGap : 0) + (showChange ? changeFontSize + lineGap : 0);
+  const topY = centerY - contentHeight / 2;
+  const nameY = topY + nameFontSize / 2;
+  const percentY = topY + nameFontSize + lineGap + percentFontSize / 2;
+  const changeY = topY + nameFontSize + lineGap + percentFontSize + lineGap + changeFontSize / 2;
+
+  const changePillWidth = showChange ? measureTextWidth(changeLabel!, changeFontSize, 700) + 10 : 0;
 
   return (
     <g>
@@ -97,24 +128,58 @@ function TreemapCell(props: any) {
           {percentLabel}
         </text>
       )}
+      {showChange && (
+        <>
+          <rect
+            x={centerX - changePillWidth / 2}
+            y={changeY - changeFontSize / 2 - 2}
+            width={changePillWidth}
+            height={changeFontSize + 4}
+            rx={changeFontSize / 2 + 2}
+            fill="rgba(0,0,0,0.35)"
+          />
+          <text x={centerX} y={changeY} textAnchor="middle" dominantBaseline="central" fill={changeColor ?? '#fff'} fontSize={changeFontSize} fontWeight={700}>
+            {changeLabel}
+          </text>
+        </>
+      )}
     </g>
   );
 }
 
 export function AllocationTreemap() {
-  const { holdings, prices } = usePortfolio();
+  const { holdings, prices, snapshots } = usePortfolio();
   const { effectiveUsdToTwd } = useFxRate();
   const [selectedClass, setSelectedClass] = useState<AssetClass | null>(null);
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
   const topLevel = computeAllocation(metrics, 'assetClass', effectiveUsdToTwd);
+  const classValuesToday = computeClassValues(metrics);
 
   const drillMetrics = selectedClass ? metrics.filter((m) => m.holding.assetClass === selectedClass) : [];
   const drillLevel = selectedClass ? computeHoldingsWithinClass(drillMetrics) : [];
 
   const data = selectedClass
-    ? toTreemapData(drillLevel, (_key, i) => DRILL_COLORS[i % DRILL_COLORS.length])
-    : toTreemapData(topLevel, (key) => CLASS_COLORS[key as AssetClass]);
+    ? toTreemapData(
+        drillLevel,
+        (_key, i) => DRILL_COLORS[i % DRILL_COLORS.length],
+        (key) => {
+          const symbol = drillMetrics.find((m) => m.holding.id === key)?.holding.symbol;
+          if (!symbol) return null;
+          const slice = drillLevel.find((s) => s.key === key);
+          if (!slice) return null;
+          return computeDayChangePct(slice.value, computePreviousSymbolValue(snapshots, symbol));
+        },
+      )
+    : toTreemapData(
+        topLevel,
+        (key) => CLASS_COLORS[key as AssetClass],
+        (key) => {
+          const assetClass = key as AssetClass;
+          const todayValue = classValuesToday[assetClass] ?? 0;
+          return computeDayChangePct(todayValue, computePreviousClassValue(snapshots, assetClass));
+        },
+      );
 
   const isEmpty = data.length === 0;
 
@@ -160,8 +225,10 @@ export function AllocationTreemap() {
             <Tooltip
               formatter={(value, _name, item) => {
                 const currency = selectedClass ? CURRENCY_FOR_ASSET_CLASS[selectedClass] : 'TWD';
-                const percentLabel = (item?.payload as TreemapDatum | undefined)?.percentLabel ?? '';
-                return [`${formatCurrencyIn(Number(value), currency)}（${percentLabel}）`, ''];
+                const payload = item?.payload as TreemapDatum | undefined;
+                const percentLabel = payload?.percentLabel ?? '';
+                const changeLabel = payload?.changePct != null ? `，較昨日 ${formatPercent(payload.changePct)}` : '';
+                return [`${formatCurrencyIn(Number(value), currency)}（${percentLabel}${changeLabel}）`, ''];
               }}
             />
           </Treemap>

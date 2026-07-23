@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
+import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
@@ -34,7 +34,11 @@ interface PortfolioContextValue {
   mergeHoldingsFromImport: (rows: ImportedHoldingRow[]) => void;
   setSettings: (patch: Partial<Settings>) => void;
   applyPriceUpdates: (entries: PriceEntry[]) => void;
-  recordCurrentSnapshot: (totalValue: number) => void;
+  recordCurrentSnapshot: (
+    totalValue: number,
+    classValues: Partial<Record<AssetClass, number>>,
+    symbolValues: Record<string, number>,
+  ) => void;
   setFxRate: (rate: FxRate) => void;
 }
 
@@ -119,8 +123,8 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setPrices(next);
     },
 
-    recordCurrentSnapshot: (totalValue) => {
-      setSnapshots(recordSnapshot(snapshots, totalValue));
+    recordCurrentSnapshot: (totalValue, classValues, symbolValues) => {
+      setSnapshots(recordSnapshot(snapshots, totalValue, classValues, symbolValues));
     },
 
     setFxRate: (rate) => {

@@ -64,7 +64,9 @@ export interface FxRate {
 
 export interface Snapshot {
   date: string;
-  totalValue: number;
+  totalValue: number; // TWD, whole-portfolio (used by the trend chart)
+  classValues?: Partial<Record<AssetClass, number>>; // native currency, per asset class
+  symbolValues?: Record<string, number>; // native currency, per holding symbol
 }
 
 export interface ImportedHoldingRow {

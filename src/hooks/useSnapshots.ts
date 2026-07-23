@@ -1,12 +1,19 @@
-import type { Snapshot } from '../types';
+import type { AssetClass, Snapshot } from '../types';
 import { todayDateString } from '../lib/calculations';
 
-export function recordSnapshot(snapshots: Snapshot[], totalValue: number, date: string = todayDateString()): Snapshot[] {
+export function recordSnapshot(
+  snapshots: Snapshot[],
+  totalValue: number,
+  classValues: Partial<Record<AssetClass, number>>,
+  symbolValues: Record<string, number>,
+  date: string = todayDateString(),
+): Snapshot[] {
+  const entry: Snapshot = { date, totalValue, classValues, symbolValues };
   const existingIndex = snapshots.findIndex((s) => s.date === date);
   if (existingIndex >= 0) {
     const updated = [...snapshots];
-    updated[existingIndex] = { date, totalValue };
+    updated[existingIndex] = entry;
     return updated;
   }
-  return [...snapshots, { date, totalValue }].sort((a, b) => a.date.localeCompare(b.date));
+  return [...snapshots, entry].sort((a, b) => a.date.localeCompare(b.date));
 }

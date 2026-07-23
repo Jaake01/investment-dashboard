@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
-import { computeHoldingMetrics, computeTotalInTwd } from '../lib/calculations';
+import { computeClassValues, computeHoldingMetrics, computeSymbolValues, computeTotalInTwd } from '../lib/calculations';
 import { useFxRate } from './useFxRate';
 import type { PriceEntry } from '../types';
 
@@ -80,7 +80,7 @@ export function usePrices() {
       const metrics = holdings.map((h) => computeHoldingMetrics(h, mergedPrices));
       const totalTwd = computeTotalInTwd(metrics, effectiveUsdToTwd);
       if (totalTwd !== null) {
-        recordCurrentSnapshot(totalTwd);
+        recordCurrentSnapshot(totalTwd, computeClassValues(metrics), computeSymbolValues(metrics));
       }
     }
 

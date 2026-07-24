@@ -49,8 +49,8 @@ export function Layout() {
             <PortfolioSummary />
             <CurrencyBreakdown />
             <AllocationTreemap />
-            <HoldingsTable />
             <TrendChart />
+            <HoldingsTable />
           </>
         ) : (
           <SettingsPanel />

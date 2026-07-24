@@ -167,6 +167,7 @@ table {
 
 .holdings-table {
   table-layout: fixed;
+  width: auto;
 }
 
 th, td {

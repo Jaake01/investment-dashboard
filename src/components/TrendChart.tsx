@@ -13,11 +13,11 @@ export function TrendChart() {
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={snapshots}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis tickFormatter={(v: number) => formatCurrencyIn(v, 'TWD')} width={90} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="date" stroke="var(--text-muted)" />
+            <YAxis tickFormatter={(v: number) => formatCurrencyIn(v, 'TWD')} width={90} stroke="var(--text-muted)" />
             <Tooltip formatter={(value) => formatCurrencyIn(Number(value), 'TWD')} />
-            <Line type="monotone" dataKey="totalValue" name="總市值" stroke="#2563eb" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="totalValue" name="總市值" stroke="var(--accent)" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       )}

@@ -20,7 +20,7 @@ export function monogramFor(symbol: string): string {
 
 // Deterministic color per symbol (not random) so the same holding always
 // gets the same badge color across renders/reloads.
-const MONOGRAM_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
+const MONOGRAM_COLORS = ['#8a6d4f', '#7a8a5f', '#b06a45', '#6b7d80', '#9b7a94', '#c99a4a', '#5f7a6e', '#a85f5f'];
 
 export function monogramColorFor(symbol: string): string {
   let hash = 0;

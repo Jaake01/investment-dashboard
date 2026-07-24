@@ -1,16 +1,18 @@
 :root {
-  --text: #3f3d45;
-  --text-h: #08060d;
-  --text-muted: #6b6375;
-  --bg: #f5f5f7;
-  --card-bg: #ffffff;
-  --border: #e5e4e7;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --gain: #16a34a;
-  --loss: #dc2626;
-  --danger: #dc2626;
-  --danger-hover: #b91c1c;
+  /* MUJI-inspired: warm neutral (not stark white/gray), muted earth-tone
+     accent instead of a bright saturated one, calm/understated throughout. */
+  --text: #4b453c;
+  --text-h: #2a2620;
+  --text-muted: #8a8071;
+  --bg: #f2ede3;
+  --card-bg: #faf8f3;
+  --border: #ddd3c0;
+  --accent: #b06a45;
+  --accent-hover: #96552f;
+  --gain: #7a8a5f;
+  --loss: #b1503c;
+  --danger: #a8452f;
+  --danger-hover: #8f3a26;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -22,16 +24,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #d1d0d5;
-    --text-h: #f3f4f6;
-    --text-muted: #9ca3af;
-    --bg: #101114;
-    --card-bg: #1a1b20;
-    --border: #2e303a;
-    --accent: #60a5fa;
-    --accent-hover: #3b82f6;
-    --gain: #4ade80;
-    --loss: #f87171;
+    --text: #d9d0c2;
+    --text-h: #f2ece0;
+    --text-muted: #a89b86;
+    --bg: #21201c;
+    --card-bg: #2a2721;
+    --border: #423c31;
+    --accent: #d4915f;
+    --accent-hover: #e2a374;
+    --gain: #9ab37c;
+    --loss: #d97b63;
+    --danger: #d97b63;
+    --danger-hover: #e28e77;
   }
 }
 
@@ -92,7 +96,7 @@ h3 {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 20px;
 }
 
@@ -201,7 +205,7 @@ th {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: 3px;
   background: var(--border);
   color: var(--text-muted);
   font-size: 11px;
@@ -212,7 +216,7 @@ th {
   border: 1px solid var(--border);
   background: var(--card-bg);
   color: var(--text);
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 7px 14px;
   font-size: 14px;
   cursor: pointer;
@@ -248,8 +252,8 @@ th {
   min-width: 96px;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(42, 38, 32, 0.12);
   overflow: hidden;
 }
 
@@ -304,7 +308,7 @@ th {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
-  border-radius: 999px;
+  border-radius: 3px;
   padding: 6px 14px;
   font-size: 13px;
   cursor: pointer;
@@ -361,7 +365,7 @@ th {
 
 input, select {
   padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: 3px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -371,7 +375,7 @@ input, select {
 .import-confirm {
   margin-top: 12px;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
 }
@@ -392,7 +396,7 @@ input, select {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(30, 26, 20, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -402,7 +406,7 @@ input, select {
 
 .modal {
   background: var(--card-bg);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 24px;
   width: 100%;
   max-width: 420px;

@@ -18,15 +18,16 @@ import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '.
 
 // Fixed per-class colors so a block's color always identifies the same asset
 // class across renders, regardless of how the classes rank by value.
+// Muted earth tones (not saturated primaries) to match the app's palette.
 const CLASS_COLORS: Record<AssetClass, string> = {
-  us_stock: '#2563eb',
-  tw_stock: '#16a34a',
-  crypto: '#d97706',
-  cash: '#0891b2',
-  other: '#7c3aed',
+  us_stock: '#8a6d4f',
+  tw_stock: '#7a8a5f',
+  crypto: '#b06a45',
+  cash: '#6b7d80',
+  other: '#9b7a94',
 };
 
-const DRILL_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
+const DRILL_COLORS = ['#8a6d4f', '#7a8a5f', '#b06a45', '#6b7d80', '#9b7a94', '#c99a4a', '#5f7a6e', '#a85f5f'];
 
 interface TreemapIcon {
   iconUrl: string | null;
@@ -89,9 +90,11 @@ function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: nu
   return 0;
 }
 
-// Taiwan market convention: up is red, down is green.
-const CHANGE_UP_COLOR = '#ef4444';
-const CHANGE_DOWN_COLOR = '#22c55e';
+// Taiwan market convention: up is red, down is green. References the same
+// --loss/--gain custom properties as .change-up/.change-down in index.css
+// (this is an inline SVG fill, not a class, so it reads the vars directly).
+const CHANGE_UP_COLOR = 'var(--loss)';
+const CHANGE_DOWN_COLOR = 'var(--gain)';
 
 // Below this, a block is too small for an icon badge to read as anything
 // but noise — falls back to text-only, same as before icons existed.

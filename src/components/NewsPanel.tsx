@@ -12,11 +12,24 @@ function formatPublishedAt(iso: string): string {
 
 export function NewsPanel() {
   const { settings, holdings } = usePortfolio();
-  const { trendingNews, holdingsNews, isLoading, error, refresh } = useNews();
+  const {
+    trendingNews,
+    holdingsNews,
+    trendingHasMore,
+    holdingsHasMore,
+    isLoading,
+    isLoadingMore,
+    error,
+    refresh,
+    loadMoreTrending,
+    loadMoreHoldings,
+  } = useNews();
   const [tab, setTab] = useState<NewsTab>('trending');
 
   const hasApiKey = settings.marketauxApiKey.trim().length > 0;
   const items = tab === 'trending' ? trendingNews : holdingsNews;
+  const hasMore = tab === 'trending' ? trendingHasMore : holdingsHasMore;
+  const loadMore = tab === 'trending' ? loadMoreTrending : loadMoreHoldings;
 
   return (
     <section className="card">
@@ -45,20 +58,27 @@ export function NewsPanel() {
       ) : items.length === 0 ? (
         <p className="empty-state">{isLoading ? '讀取中…' : '目前沒有新聞可顯示。'}</p>
       ) : (
-        <ul className="news-list">
-          {items.map((item) => (
-            <li className="news-item" key={item.id}>
-              <a href={item.url} target="_blank" rel="noreferrer" className="news-item-title">
-                {item.title}
-              </a>
-              <p className="news-item-meta">
-                {item.source} · {formatPublishedAt(item.publishedAt)}
-                {item.relatedSymbols.length > 0 ? ` · ${item.relatedSymbols.join(', ')}` : ''}
-              </p>
-              {item.snippet && <p className="news-item-snippet">{item.snippet}</p>}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="news-list">
+            {items.map((item) => (
+              <li className="news-item" key={item.id}>
+                <a href={item.url} target="_blank" rel="noreferrer" className="news-item-title">
+                  {item.title}
+                </a>
+                <p className="news-item-meta">
+                  {item.source} · {formatPublishedAt(item.publishedAt)}
+                  {item.relatedSymbols.length > 0 ? ` · ${item.relatedSymbols.join(', ')}` : ''}
+                </p>
+                {item.snippet && <p className="news-item-snippet">{item.snippet}</p>}
+              </li>
+            ))}
+          </ul>
+          {hasMore && (
+            <button className="btn news-load-more" onClick={loadMore} disabled={isLoadingMore}>
+              {isLoadingMore ? '讀取中…' : '查看更多'}
+            </button>
+          )}
+        </>
       )}
     </section>
   );

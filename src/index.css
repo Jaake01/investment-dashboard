@@ -261,6 +261,11 @@ h3 {
   color: var(--text);
 }
 
+.news-load-more {
+  display: block;
+  margin: 16px auto 0;
+}
+
 .table-scroll {
   overflow-x: auto;
 }

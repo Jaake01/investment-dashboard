@@ -11,8 +11,15 @@ export function useNews() {
   const { settings, holdings } = usePortfolio();
   const [trendingNews, setTrendingNews] = useState<NewsItem[]>([]);
   const [holdingsNews, setHoldingsNews] = useState<NewsItem[]>([]);
+  const [trendingPage, setTrendingPage] = useState(1);
+  const [holdingsPage, setHoldingsPage] = useState(1);
+  const [trendingHasMore, setTrendingHasMore] = useState(false);
+  const [holdingsHasMore, setHoldingsHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
+
+  const holdingSymbols = () => Array.from(new Set(holdings.map((h) => h.symbol.trim()).filter(Boolean)));
 
   const refresh = async () => {
     const apiKey = settings.marketauxApiKey.trim();
@@ -23,17 +30,56 @@ export function useNews() {
     setIsLoading(true);
     setError('');
     try {
-      const symbols = Array.from(new Set(holdings.map((h) => h.symbol.trim()).filter(Boolean)));
       const [trending, holdingsResult] = await Promise.all([
-        fetchTrendingNews(apiKey),
-        fetchHoldingsNews(apiKey, symbols),
+        fetchTrendingNews(apiKey, 1),
+        fetchHoldingsNews(apiKey, holdingSymbols(), 1),
       ]);
-      setTrendingNews(trending);
-      setHoldingsNews(holdingsResult);
+      setTrendingNews(trending.items);
+      setTrendingHasMore(trending.hasMore);
+      setTrendingPage(1);
+      setHoldingsNews(holdingsResult.items);
+      setHoldingsHasMore(holdingsResult.hasMore);
+      setHoldingsPage(1);
     } catch (err) {
       setError(err instanceof NewsFetchError ? err.message : '新聞讀取失敗');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMoreTrending = async () => {
+    const apiKey = settings.marketauxApiKey.trim();
+    if (!apiKey) return;
+    setIsLoadingMore(true);
+    setError('');
+    try {
+      const nextPage = trendingPage + 1;
+      const result = await fetchTrendingNews(apiKey, nextPage);
+      setTrendingNews((prev) => [...prev, ...result.items]);
+      setTrendingHasMore(result.hasMore);
+      setTrendingPage(nextPage);
+    } catch (err) {
+      setError(err instanceof NewsFetchError ? err.message : '新聞讀取失敗');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const loadMoreHoldings = async () => {
+    const apiKey = settings.marketauxApiKey.trim();
+    if (!apiKey) return;
+    setIsLoadingMore(true);
+    setError('');
+    try {
+      const nextPage = holdingsPage + 1;
+      const result = await fetchHoldingsNews(apiKey, holdingSymbols(), nextPage);
+      setHoldingsNews((prev) => [...prev, ...result.items]);
+      setHoldingsHasMore(result.hasMore);
+      setHoldingsPage(nextPage);
+    } catch (err) {
+      setError(err instanceof NewsFetchError ? err.message : '新聞讀取失敗');
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -46,5 +92,16 @@ export function useNews() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { trendingNews, holdingsNews, isLoading, error, refresh };
+  return {
+    trendingNews,
+    holdingsNews,
+    trendingHasMore,
+    holdingsHasMore,
+    isLoading,
+    isLoadingMore,
+    error,
+    refresh,
+    loadMoreTrending,
+    loadMoreHoldings,
+  };
 }

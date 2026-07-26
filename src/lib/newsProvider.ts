@@ -17,14 +17,28 @@ interface MarketauxArticle {
   entities?: MarketauxEntity[];
 }
 
+interface MarketauxMeta {
+  found: number;
+  returned: number;
+  limit: number;
+  page: number;
+}
+
 interface MarketauxResponse {
   data?: MarketauxArticle[];
+  meta?: MarketauxMeta;
   error?: { message?: string };
 }
 
-const BASE_URL = 'https://api.marketaux.com/v1/news/all';
+export interface NewsPage {
+  items: NewsItem[];
+  hasMore: boolean;
+}
 
-async function fetchMarketaux(params: Record<string, string>): Promise<NewsItem[]> {
+const BASE_URL = 'https://api.marketaux.com/v1/news/all';
+const PAGE_SIZE = 20;
+
+async function fetchMarketaux(params: Record<string, string>): Promise<NewsPage> {
   const query = new URLSearchParams(params).toString();
   const url = `${BASE_URL}?${query}`;
   let response: Response;
@@ -48,7 +62,7 @@ async function fetchMarketaux(params: Record<string, string>): Promise<NewsItem[
     throw new NewsFetchError(`Marketaux：${data.error.message ?? '未知錯誤'}`);
   }
   const articles = data.data ?? [];
-  return articles.map((a) => ({
+  const items = articles.map((a) => ({
     id: a.uuid,
     title: a.title,
     snippet: a.snippet ?? a.description ?? '',
@@ -59,16 +73,27 @@ async function fetchMarketaux(params: Record<string, string>): Promise<NewsItem[
       .map((e) => e.symbol)
       .filter((s): s is string => Boolean(s)),
   }));
+  // meta.found is the total match count across all pages; if we haven't
+  // reached it yet (or the API omitted meta), there may be more to load.
+  const meta = data.meta;
+  const hasMore = meta ? meta.page * meta.limit < meta.found : items.length >= PAGE_SIZE;
+  return { items, hasMore };
 }
 
 // General financial headlines — Marketaux doesn't expose a true "trending by
 // attention" ranking on the free tier, so this is its default relevance/
 // recency-sorted feed rather than a literal popularity ranking.
-export async function fetchTrendingNews(apiKey: string): Promise<NewsItem[]> {
-  return fetchMarketaux({ api_token: apiKey, language: 'en,zh', limit: '20' });
+export async function fetchTrendingNews(apiKey: string, page = 1): Promise<NewsPage> {
+  return fetchMarketaux({ api_token: apiKey, language: 'en,zh', limit: String(PAGE_SIZE), page: String(page) });
 }
 
-export async function fetchHoldingsNews(apiKey: string, symbols: string[]): Promise<NewsItem[]> {
-  if (symbols.length === 0) return [];
-  return fetchMarketaux({ api_token: apiKey, symbols: symbols.join(','), language: 'en,zh', limit: '20' });
+export async function fetchHoldingsNews(apiKey: string, symbols: string[], page = 1): Promise<NewsPage> {
+  if (symbols.length === 0) return { items: [], hasMore: false };
+  return fetchMarketaux({
+    api_token: apiKey,
+    symbols: symbols.join(','),
+    language: 'en,zh',
+    limit: String(PAGE_SIZE),
+    page: String(page),
+  });
 }

@@ -18,6 +18,8 @@ const DEFAULT_SETTINGS: Settings = {
   priceProvider: 'none',
   apiKey: '',
   twQuoteSheetUrl: '',
+  marketauxApiKey: '',
+  theme: 'system',
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

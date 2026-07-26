@@ -266,6 +266,11 @@ h3 {
   margin: 16px auto 0;
 }
 
+.news-link-icon {
+  margin-left: 4px;
+  text-decoration: none;
+}
+
 .table-scroll {
   overflow-x: auto;
 }

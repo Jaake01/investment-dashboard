@@ -62,6 +62,9 @@ export interface PriceEntry {
   symbol: string;
   price: number;
   updatedAt: string;
+  // Day change %, when the price source provides one (not all do — e.g. the
+  // GOOGLEFINANCE TW quote sheet has no previous-close data).
+  changePercent?: number;
 }
 
 export interface FxRate {

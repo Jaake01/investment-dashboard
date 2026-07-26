@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
-import { formatCurrencyIn, formatNumber, formatPercent } from '../lib/format';
+import { formatCurrencyIn, formatNumber, formatPercent, googleNewsUrlFor } from '../lib/format';
 import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
@@ -11,7 +11,7 @@ const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 // Fixed pixel widths (used with table-layout: fixed) so columns don't
 // reshuffle as values change length — e.g. switching tabs between
 // currencies, or a price refresh changing digit count.
-const COLUMN_WIDTHS = ['70px', '110px', '90px', '100px', '110px', '100px', '80px', '50px'];
+const COLUMN_WIDTHS = ['70px', '110px', '80px', '90px', '100px', '110px', '100px', '80px', '50px'];
 
 interface OpenMenu {
   id: string;
@@ -82,6 +82,7 @@ export function HoldingsTable() {
               <tr>
                 <th>代號</th>
                 <th>現價</th>
+                <th>漲跌</th>
                 <th>數量</th>
                 <th>平均成本</th>
                 <th>市值</th>
@@ -95,12 +96,29 @@ export function HoldingsTable() {
                 const isGain = m.gainLoss >= 0;
                 const currency = CURRENCY_FOR_ASSET_CLASS[m.holding.assetClass];
                 const isMenuOpen = openMenu?.id === m.holding.id;
+                const changePercent = m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined;
                 return (
                   <tr key={m.holding.id}>
-                    <td>{m.holding.symbol || '—'}</td>
+                    <td>
+                      {m.holding.symbol || '—'}
+                      {m.holding.symbol && (
+                        <a
+                          className="news-link-icon"
+                          href={googleNewsUrlFor(m.holding.symbol)}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 7 天）`}
+                        >
+                          📰
+                        </a>
+                      )}
+                    </td>
                     <td>
                       {formatCurrencyIn(m.currentPrice, currency)}
                       {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
+                    </td>
+                    <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
+                      {changePercent === undefined ? '—' : formatPercent(changePercent)}
                     </td>
                     <td>{formatNumber(m.holding.shares)}</td>
                     <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>

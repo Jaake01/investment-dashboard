@@ -1,5 +1,6 @@
 import type { AssetClass } from '../../types';
 import { PriceFetchError } from './errors';
+import type { QuoteResult } from './index';
 
 interface FinnhubQuoteResponse {
   c: number;
@@ -10,7 +11,7 @@ interface FinnhubQuoteResponse {
   t: number;
 }
 
-export async function fetchFinnhubQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number> {
+export async function fetchFinnhubQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<QuoteResult> {
   if (assetClass === 'crypto') {
     // Finnhub's /quote endpoint has no crypto pair support — a bare ticker
     // like "BTC" can silently match an unrelated stock instead of failing,
@@ -32,5 +33,6 @@ export async function fetchFinnhubQuote(symbol: string, apiKey: string, assetCla
   if (!data || typeof data.c !== 'number' || data.c === 0) {
     throw new PriceFetchError(`${symbol}：找不到報價，請確認代號是否正確`);
   }
-  return data.c;
+  const changePercent = typeof data.pc === 'number' && data.pc !== 0 ? ((data.c - data.pc) / data.pc) * 100 : undefined;
+  return { price: data.c, changePercent };
 }

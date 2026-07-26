@@ -2,10 +2,15 @@ import type { AssetClass, PriceProviderId } from '../../types';
 import { fetchFinnhubQuote } from './finnhub';
 import { fetchTwelveDataQuote } from './twelvedata';
 
+export interface QuoteResult {
+  price: number;
+  changePercent?: number;
+}
+
 export interface ProviderAdapter {
   id: PriceProviderId;
   label: string;
-  fetchQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number>;
+  fetchQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<QuoteResult>;
 }
 
 export { PriceFetchError } from './errors';

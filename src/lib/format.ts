@@ -38,3 +38,9 @@ export function formatPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(1)}%`;
 }
+
+// hl/gl/ceid=zh-TW bias Google News toward Chinese-language sources/UI.
+export function googleNewsUrlFor(symbol: string): string {
+  const query = `${symbol} when:7d`;
+  return `https://news.google.com/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+}

@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   twQuoteSheetUrl: '',
   marketauxApiKey: '',
+  theme: 'system',
 };
 
 export type NewHoldingInput = Omit<Holding, 'id' | 'source'>;

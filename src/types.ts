@@ -42,6 +42,8 @@ export interface Holding {
 
 export type PriceProviderId = 'finnhub' | 'twelvedata' | 'none';
 
+export type Theme = 'light' | 'dark' | 'system';
+
 export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
@@ -52,6 +54,8 @@ export interface Settings {
   twQuoteSheetUrl: string;
   // Optional: Marketaux API token, used only by the 新聞 tab.
   marketauxApiKey: string;
+  // 'system' follows the OS/browser prefers-color-scheme; 'light'/'dark' force it.
+  theme: Theme;
 }
 
 export interface PriceEntry {

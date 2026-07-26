@@ -39,6 +39,39 @@
   }
 }
 
+/* Manual override via the theme toggle (Layout sets data-theme on <html>).
+   The attribute selector has higher specificity than the bare :root inside
+   the media query above, so this wins regardless of OS preference when set. */
+:root[data-theme='light'] {
+  --text: #4b453c;
+  --text-h: #2a2620;
+  --text-muted: #6f6656;
+  --bg: #f2ede3;
+  --card-bg: #faf8f3;
+  --border: #ddd3c0;
+  --accent: #b06a45;
+  --accent-hover: #96552f;
+  --gain: #7a8a5f;
+  --loss: #b1503c;
+  --danger: #a8452f;
+  --danger-hover: #8f3a26;
+}
+
+:root[data-theme='dark'] {
+  --text: #d9d0c2;
+  --text-h: #f2ece0;
+  --text-muted: #bfb29c;
+  --bg: #21201c;
+  --card-bg: #2a2721;
+  --border: #423c31;
+  --accent: #d4915f;
+  --accent-hover: #e2a374;
+  --gain: #9ab37c;
+  --loss: #d97b63;
+  --danger: #d97b63;
+  --danger-hover: #e28e77;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -79,8 +112,45 @@ h3 {
   background: var(--card-bg);
 }
 
-.app-header-tabs {
+.app-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   margin: 10px 0 0;
+}
+
+.app-header-tabs {
+  margin: 0;
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+.theme-toggle-btn {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  border-radius: 2px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text);
+}
+
+.theme-toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
 }
 
 .app-main {

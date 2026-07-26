@@ -18,16 +18,17 @@ import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '.
 
 // Fixed per-class colors so a block's color always identifies the same asset
 // class across renders, regardless of how the classes rank by value.
-// Muted earth tones (not saturated primaries) to match the app's palette.
+// Vivid pastel/candy tones (per request) — distinct from the rest of the
+// app's muted earth-tone palette, scoped to just this chart.
 const CLASS_COLORS: Record<AssetClass, string> = {
-  us_stock: '#8a6d4f',
-  tw_stock: '#7a8a5f',
-  crypto: '#b06a45',
-  cash: '#6b7d80',
-  other: '#9b7a94',
+  us_stock: '#4F9DDE',
+  tw_stock: '#4CAF7D',
+  crypto: '#E8735C',
+  cash: '#8B7FC7',
+  other: '#D9A441',
 };
 
-const DRILL_COLORS = ['#8a6d4f', '#7a8a5f', '#b06a45', '#6b7d80', '#9b7a94', '#c99a4a', '#5f7a6e', '#a85f5f'];
+const DRILL_COLORS = ['#4F9DDE', '#4CAF7D', '#E8735C', '#8B7FC7', '#D9A441', '#E07A9E', '#3FB6A8', '#F2955C'];
 
 interface TreemapIcon {
   iconUrl: string | null;

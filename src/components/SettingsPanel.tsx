@@ -6,7 +6,13 @@ import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
-import type { ImportedHoldingRow, PriceProviderId } from '../types';
+import type { ImportedHoldingRow, PriceProviderId, Theme } from '../types';
+
+const THEME_OPTIONS: { value: Theme; label: string }[] = [
+  { value: 'light', label: '淺色' },
+  { value: 'dark', label: '深色' },
+  { value: 'system', label: '系統' },
+];
 
 export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
@@ -39,6 +45,21 @@ export function SettingsPanel() {
   return (
     <section className="card">
       <h2>設定</h2>
+
+      <div className="settings-group">
+        <h3>外觀</h3>
+        <div className="theme-toggle" role="group" aria-label="外觀">
+          {THEME_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className={`theme-toggle-btn ${settings.theme === opt.value ? 'active' : ''}`}
+              onClick={() => setSettings({ theme: opt.value })}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="settings-group">
         <h3>Google Sheet 匯入</h3>

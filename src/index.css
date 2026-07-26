@@ -112,21 +112,12 @@ h3 {
   background: var(--card-bg);
 }
 
-.app-header-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+.app-header-tabs {
   margin: 10px 0 0;
 }
 
-.app-header-tabs {
-  margin: 0;
-}
-
 .theme-toggle {
-  display: flex;
+  display: inline-flex;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);

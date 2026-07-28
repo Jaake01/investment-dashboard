@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject }
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import {
+  computeAllocation,
+  computeClassValues,
   computeDayChangePct,
   computeHoldingMetrics,
+  computePreviousClassValue,
   computePreviousSymbolValue,
   convertToTwd,
   type HoldingMetrics,
@@ -39,6 +42,12 @@ function bubbleColorFor(assetClass: AssetClass, seed: string): string {
   const saturation = 48 + ((hash >> 4) % 38);
   const lightness = 36 + ((hash >> 9) % 26);
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+// One flat color per class (no per-symbol variation, unlike bubbleColorFor)
+// — the pie chart has one slice per class, not one per holding.
+function classColorFor(assetClass: AssetClass): string {
+  return `hsl(${CLASS_HUE[assetClass]}, 62%, 50%)`;
 }
 
 interface BubbleIcon {
@@ -421,6 +430,150 @@ function BubbleChartSvg({
   );
 }
 
+interface PieDatum {
+  key: AssetClass;
+  label: string;
+  value: number;
+  percent: number;
+  percentLabel: string;
+  fill: string;
+  changePct: number | null;
+}
+
+// Class-level breakdown (one slice per asset class) for the overview's pie
+// chart — a coarser view than the bubble chart's per-holding breakdown.
+function buildPieData(metrics: HoldingMetrics[], usdToTwd: number | null, snapshots: Snapshot[]): PieDatum[] {
+  const slices = computeAllocation(metrics, 'assetClass', usdToTwd);
+  const classValuesToday = computeClassValues(metrics);
+  const total = slices.reduce((sum, s) => sum + s.value, 0);
+  return slices.map((s) => {
+    const assetClass = s.key as AssetClass;
+    const percent = total > 0 ? (s.value / total) * 100 : 0;
+    const todayValue = classValuesToday[assetClass] ?? 0;
+    return {
+      key: assetClass,
+      label: s.label,
+      value: s.value,
+      percent,
+      percentLabel: `${percent.toFixed(1)}%`,
+      fill: classColorFor(assetClass),
+      changePct: computeDayChangePct(todayValue, computePreviousClassValue(snapshots, assetClass)),
+    };
+  });
+}
+
+const PIE_SIZE = 320;
+const PIE_RADIUS = 130;
+// Below this share, an inline label would be squeezed into an unreadably
+// thin wedge — the legend still shows the exact figure either way.
+const PIE_LABEL_MIN_PERCENT = 6;
+
+function polarPoint(cx: number, cy: number, r: number, angle: number) {
+  return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+}
+
+function PieSlice({
+  datum,
+  startAngle,
+  endAngle,
+  cx,
+  cy,
+  onHover,
+  onLeave,
+}: {
+  datum: PieDatum;
+  startAngle: number;
+  endAngle: number;
+  cx: number;
+  cy: number;
+  onHover: (e: MouseEvent, datum: PieDatum) => void;
+  onLeave: () => void;
+}) {
+  const start = polarPoint(cx, cy, PIE_RADIUS, startAngle);
+  const end = polarPoint(cx, cy, PIE_RADIUS, endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  const path = `M ${cx} ${cy} L ${start.x} ${start.y} A ${PIE_RADIUS} ${PIE_RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+  const labelPoint = polarPoint(cx, cy, PIE_RADIUS * 0.65, (startAngle + endAngle) / 2);
+
+  return (
+    <g onMouseEnter={(e) => onHover(e, datum)} onMouseMove={(e) => onHover(e, datum)} onMouseLeave={onLeave}>
+      <path d={path} style={{ fill: datum.fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
+      {datum.percent >= PIE_LABEL_MIN_PERCENT && (
+        <text
+          x={labelPoint.x}
+          y={labelPoint.y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#fff"
+          fontSize={15}
+          fontWeight={700}
+          strokeWidth={2}
+          {...TEXT_OUTLINE}
+        >
+          {datum.percentLabel}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function PieChartSvg({ data }: { data: PieDatum[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<{ datum: PieDatum; left: number; top: number } | null>(null);
+  const cx = PIE_SIZE / 2;
+  const cy = PIE_SIZE / 2;
+
+  const showTooltip = (e: MouseEvent, datum: PieDatum) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltip({ datum, left: e.clientX - rect.left, top: e.clientY - rect.top });
+  };
+
+  let cursor = -Math.PI / 2;
+  const slices = data.map((d) => {
+    const sweep = (d.percent / 100) * Math.PI * 2;
+    const slice = { datum: d, startAngle: cursor, endAngle: cursor + sweep };
+    cursor += sweep;
+    return slice;
+  });
+
+  return (
+    <div ref={containerRef} className="pie-chart-wrap">
+      <svg width={PIE_SIZE} height={PIE_SIZE} viewBox={`0 0 ${PIE_SIZE} ${PIE_SIZE}`}>
+        {slices.map((s) => (
+          <PieSlice
+            key={s.datum.key}
+            datum={s.datum}
+            startAngle={s.startAngle}
+            endAngle={s.endAngle}
+            cx={cx}
+            cy={cy}
+            onHover={showTooltip}
+            onLeave={() => setTooltip(null)}
+          />
+        ))}
+      </svg>
+      <ul className="pie-legend">
+        {data.map((d) => (
+          <li key={d.key}>
+            <span className="pie-legend-dot" style={{ background: d.fill }} />
+            {d.label} · {d.percentLabel}
+          </li>
+        ))}
+      </ul>
+      {tooltip && (
+        <div className="bubble-tooltip" style={{ left: tooltip.left + 12, top: tooltip.top + 12 }}>
+          <strong>{tooltip.datum.label}</strong>
+          <div>
+            {formatCurrencyIn(tooltip.datum.value, 'TWD')}（{tooltip.datum.percentLabel}
+            {tooltip.datum.changePct != null ? `，較昨日 ${formatPercent(tooltip.datum.changePct)}` : ''}）
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Fixed tab list (matches HoldingsTable's BASE_TABS) so the class switcher
 // doesn't appear/disappear as holdings change — 'other' only shows up once
 // it's actually used, same as there.
@@ -430,6 +583,10 @@ export function AllocationBubbleChart() {
   const { holdings, prices, snapshots } = usePortfolio();
   const { effectiveUsdToTwd } = useFxRate();
   const [selectedClass, setSelectedClass] = useState<AssetClass | null>(null);
+  // The pie view only makes sense at the class-level overview — drilling
+  // into a single class still always shows its individual holdings as
+  // bubbles, regardless of this setting.
+  const [viewMode, setViewMode] = useState<'bubble' | 'pie'>('bubble');
   const measureRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(measureRef);
 
@@ -440,11 +597,23 @@ export function AllocationBubbleChart() {
   const data = buildBubbleData(metrics, selectedClass, effectiveUsdToTwd, snapshots);
   const isEmpty = data.length === 0;
   const currency = selectedClass ? CURRENCY_FOR_ASSET_CLASS[selectedClass] : 'TWD';
+  const showPie = selectedClass === null && viewMode === 'pie';
+  const pieData = showPie ? buildPieData(metrics, effectiveUsdToTwd, snapshots) : [];
 
   return (
     <section className="card">
       <div className="card-header">
         <h2>資產配置{selectedClass ? `（${ASSET_CLASS_LABELS[selectedClass]}）` : ''}</h2>
+        {selectedClass === null && (
+          <div className="theme-toggle" role="group" aria-label="圖表類型">
+            <button className={`theme-toggle-btn ${viewMode === 'bubble' ? 'active' : ''}`} onClick={() => setViewMode('bubble')}>
+              氣泡圖
+            </button>
+            <button className={`theme-toggle-btn ${viewMode === 'pie' ? 'active' : ''}`} onClick={() => setViewMode('pie')}>
+              圓餅圖
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tab-bar">
@@ -476,6 +645,8 @@ export function AllocationBubbleChart() {
           <p className="empty-state">
             {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
           </p>
+        ) : showPie ? (
+          <PieChartSvg data={pieData} />
         ) : (
           width > 0 && <BubbleChartSvg data={data} currency={currency} width={width} height={CHART_HEIGHT} />
         )}

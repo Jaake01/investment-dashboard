@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
-import { formatCurrencyIn, formatNumber, formatPercent, googleNewsUrlFor } from '../lib/format';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
+import { formatDollar, formatNumber, formatPercent, googleNewsUrlFor } from '../lib/format';
+import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
 const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
@@ -94,7 +94,6 @@ export function HoldingsTable() {
             <tbody>
               {metrics.map((m) => {
                 const isGain = m.gainLoss >= 0;
-                const currency = CURRENCY_FOR_ASSET_CLASS[m.holding.assetClass];
                 const isMenuOpen = openMenu?.id === m.holding.id;
                 const changePercent = m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined;
                 return (
@@ -114,16 +113,16 @@ export function HoldingsTable() {
                       )}
                     </td>
                     <td>
-                      {formatCurrencyIn(m.currentPrice, currency)}
+                      {formatDollar(m.currentPrice)}
                       {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
                     </td>
                     <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
                       {changePercent === undefined ? '—' : formatPercent(changePercent)}
                     </td>
                     <td>{formatNumber(m.holding.shares)}</td>
-                    <td>{formatCurrencyIn(m.holding.avgCost, currency)}</td>
-                    <td>{formatCurrencyIn(m.marketValue, currency)}</td>
-                    <td className={isGain ? 'gain' : 'loss'}>{formatCurrencyIn(m.gainLoss, currency)}</td>
+                    <td>{formatDollar(m.holding.avgCost)}</td>
+                    <td>{formatDollar(m.marketValue)}</td>
+                    <td className={isGain ? 'gain' : 'loss'}>{formatDollar(m.gainLoss)}</td>
                     <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
                       <button

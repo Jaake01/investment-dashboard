@@ -30,6 +30,14 @@ export function formatCurrencyIn(value: number, currency: Currency): string {
   return currencyFormatter.format(value);
 }
 
+// Plain "$" prefix regardless of the holding's actual currency — used in the
+// holdings table where the asset-class tabs already give currency context,
+// so per-row "US$"/"NT$"/"U" labels are more clutter than signal.
+export function formatDollar(value: number): string {
+  const sign = value < 0 ? '-' : '';
+  return `${sign}$${usdcNumberFormatter.format(Math.abs(value))}`;
+}
+
 export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }

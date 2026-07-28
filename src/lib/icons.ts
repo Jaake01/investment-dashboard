@@ -1,15 +1,20 @@
 import type { AssetClass } from '../types';
 
-// Ticker-keyed, no-key CDN (jsDelivr mirroring the well-established
-// spothq/cryptocurrency-icons GitHub set) — covers major crypto tickers with
-// no lookup table needed. There's no equivalent no-key, ticker-keyed source
-// for US/TW stock logos (real stock logo APIs need a domain-name mapping or
-// a paid key), so those fall back to a monogram badge instead.
+// Ticker-keyed, no-key CDNs (jsDelivr mirroring GitHub logo sets) — covers
+// major crypto tickers and NYSE/NASDAQ stock logos with no lookup table
+// needed. There's no equivalent free, ticker-keyed source for TW stocks
+// (numeric codes aren't covered by any of these sets), so those still fall
+// back to a monogram badge — as does any US ticker missing from the set,
+// via the <img>'s onError handler (see TreemapCell/BubbleContent).
 const CRYPTO_ICON_BASE = 'https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color';
+const US_STOCK_ICON_BASE = 'https://cdn.jsdelivr.net/gh/davidepalazzo/ticker-logos@main/ticker_icons';
 
 export function realIconUrlFor(symbol: string, assetClass: AssetClass): string | null {
   if (assetClass === 'crypto') {
     return `${CRYPTO_ICON_BASE}/${symbol.trim().toLowerCase()}.png`;
+  }
+  if (assetClass === 'us_stock') {
+    return `${US_STOCK_ICON_BASE}/${symbol.trim().toUpperCase()}.png`;
   }
   return null;
 }

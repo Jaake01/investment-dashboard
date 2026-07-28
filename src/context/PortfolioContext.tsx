@@ -16,7 +16,8 @@ import { DEFAULT_SHEET_URL } from '../lib/config';
 const DEFAULT_SETTINGS: Settings = {
   sheetUrl: DEFAULT_SHEET_URL,
   priceProvider: 'none',
-  apiKey: '',
+  finnhubApiKey: '',
+  twelveDataApiKey: '',
   twQuoteSheetUrl: '',
   marketauxApiKey: '',
   theme: 'system',
@@ -55,7 +56,27 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   // saved by an older version of the app that's missing fields added since
   // (e.g. twQuoteSheetUrl) — reading those as `undefined` instead of '' broke
   // every `.trim()` call on them. This self-heals regardless of what's stored.
-  const settings = useMemo<Settings>(() => ({ ...DEFAULT_SETTINGS, ...storedSettings }), [storedSettings]);
+  const settings = useMemo<Settings>(() => {
+    // One-time migration: versions before the per-provider key split stored a
+    // single shared `apiKey` regardless of which provider was selected. Move
+    // it into whichever provider it currently belongs to — then drop the
+    // legacy field entirely rather than leaving it in `settings`, since the
+    // next setSettings() call spreads `settings` back into storage; keeping
+    // it around would make it resurface and get misapplied again the next
+    // time the provider changes (it doesn't track *which* provider it was
+    // originally saved for, so re-checking it against a later provider
+    // choice would silently reassign a stale key to the wrong one).
+    const { apiKey: legacyApiKey, ...rest } = storedSettings as Partial<Settings> & { apiKey?: string };
+    const merged: Settings = { ...DEFAULT_SETTINGS, ...rest };
+    if (legacyApiKey) {
+      if (merged.priceProvider === 'finnhub' && !merged.finnhubApiKey) {
+        merged.finnhubApiKey = legacyApiKey;
+      } else if (merged.priceProvider === 'twelvedata' && !merged.twelveDataApiKey) {
+        merged.twelveDataApiKey = legacyApiKey;
+      }
+    }
+    return merged;
+  }, [storedSettings]);
   const [prices, setPrices] = useLocalStorage<Record<string, PriceEntry>>(storageKey('prices'), {});
   const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>(storageKey('snapshots'), []);
   const [fxRate, setFxRateState] = useLocalStorage<FxRate | null>(storageKey('fxRate'), null);

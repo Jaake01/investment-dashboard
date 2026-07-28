@@ -13,16 +13,19 @@ import { formatCurrencyIn, formatPercent } from '../lib/format';
 import { monogramColorFor, monogramFor, realIconUrlFor } from '../lib/icons';
 import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency, type Snapshot } from '../types';
 
-// One base hue per asset class (matches the old treemap's CLASS_COLORS
-// family) — individual holdings within a class get a shade of that same
-// hue (see bubbleColorFor) so same-class bubbles read as related at a
-// glance while still being distinguishable from each other.
+// One base hue per asset class, spread evenly around the full color wheel
+// (~70-90° apart) so classes stay visually distinct from each other —
+// crypto red-orange, us_stock yellow-green, tw_stock blue-violet (per
+// request), with cash/other filling the remaining gaps. Individual holdings
+// within a class get a hue/shade variation around that base (see
+// bubbleColorFor) so same-class bubbles read as related at a glance while
+// still being clearly distinguishable from each other.
 const CLASS_HUE: Record<AssetClass, number> = {
-  us_stock: 205,
-  tw_stock: 150,
-  crypto: 10,
-  cash: 253,
-  other: 38,
+  crypto: 15,
+  us_stock: 80,
+  other: 165,
+  tw_stock: 255,
+  cash: 315,
 };
 
 function hashString(s: string): number {
@@ -33,9 +36,9 @@ function hashString(s: string): number {
 
 function bubbleColorFor(assetClass: AssetClass, seed: string): string {
   const hash = hashString(seed);
-  const hue = CLASS_HUE[assetClass] + ((hash % 13) - 6);
-  const saturation = 52 + ((hash >> 4) % 26);
-  const lightness = 40 + ((hash >> 9) % 20);
+  const hue = CLASS_HUE[assetClass] + ((hash % 37) - 18);
+  const saturation = 48 + ((hash >> 4) % 38);
+  const lightness = 36 + ((hash >> 9) % 26);
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
@@ -113,16 +116,18 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   // Radius bounds shrink a bit as the bubble count grows, so a long holdings
   // list still has a reasonable chance of fitting without heavy overlap.
-  const maxRadius = Math.max(24, Math.min(70, 300 / Math.sqrt(data.length)));
-  const minRadius = Math.max(12, maxRadius * 0.32);
+  const maxRadius = Math.max(28, Math.min(85, 360 / Math.sqrt(data.length)));
+  const minRadius = Math.max(14, maxRadius * 0.32);
 
   const classesPresent = ASSET_CLASSES.filter((c) => data.some((d) => d.assetClass === c));
   const centerX = width / 2;
   const centerY = height / 2;
-  // Elliptical (not circular) spread so cluster anchors actually use a wide
-  // canvas's width instead of bunching into a small circle in the middle.
-  const spreadX = width * 0.32;
-  const spreadY = height * 0.3;
+  // Elliptical (not circular) spread so cluster anchors use a wide canvas's
+  // width instead of bunching into a small circle in the middle, while still
+  // pulling clusters close enough together to read as one connected group
+  // rather than isolated islands with empty space between them.
+  const spreadX = width * 0.2;
+  const spreadY = height * 0.2;
   const anchors: Partial<Record<AssetClass, { x: number; y: number }>> = {};
   classesPresent.forEach((c, i) => {
     const angle = (i / classesPresent.length) * Math.PI * 2 - Math.PI / 2;
@@ -286,7 +291,7 @@ interface TooltipState {
   top: number;
 }
 
-const CHART_HEIGHT = 360;
+const CHART_HEIGHT = 480;
 
 // recharts v3's ResponsiveContainer only measures/sizes actual recharts chart
 // components (via an internal context), not arbitrary children — so a

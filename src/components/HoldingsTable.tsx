@@ -1,10 +1,53 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
-import { computeHoldingMetrics } from '../lib/calculations';
+import { computeHoldingMetrics, type HoldingMetrics } from '../lib/calculations';
 import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
 import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
+
+type SortKey = 'symbol' | 'price' | 'change' | 'shares' | 'avgCost' | 'marketValue' | 'gainLoss' | 'gainLossPct';
+
+interface Row {
+  m: HoldingMetrics;
+  changePercent?: number;
+}
+
+function sortValue(row: Row, key: SortKey): number | string | undefined {
+  switch (key) {
+    case 'symbol':
+      return row.m.holding.symbol || '';
+    case 'price':
+      return row.m.currentPrice;
+    case 'change':
+      return row.changePercent;
+    case 'shares':
+      return row.m.holding.shares;
+    case 'avgCost':
+      return row.m.holding.avgCost;
+    case 'marketValue':
+      return row.m.marketValue;
+    case 'gainLoss':
+      return row.m.gainLoss;
+    case 'gainLossPct':
+      return row.m.gainLossPct;
+  }
+}
+
+// Missing values (e.g. no live change% for this row) always sort last,
+// regardless of direction, rather than landing at the "top" of a desc sort.
+function compareRows(a: Row, b: Row, key: SortKey, dir: 'asc' | 'desc'): number {
+  const av = sortValue(a, key);
+  const bv = sortValue(b, key);
+  if (av === undefined && bv === undefined) return 0;
+  if (av === undefined) return 1;
+  if (bv === undefined) return -1;
+  const cmp =
+    typeof av === 'string' || typeof bv === 'string'
+      ? String(av).localeCompare(String(bv), 'zh-Hant')
+      : (av as number) - (bv as number);
+  return dir === 'asc' ? cmp : -cmp;
+}
 
 const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 
@@ -25,7 +68,18 @@ export function HoldingsTable() {
   const [isAdding, setIsAdding] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
   const [selectedClass, setSelectedClass] = useState<AssetClass>('us_stock');
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   useEffect(() => {
     if (!openMenu) return;
@@ -44,6 +98,12 @@ export function HoldingsTable() {
   const metrics = holdings
     .filter((h) => h.assetClass === selectedClass)
     .map((h) => computeHoldingMetrics(h, prices));
+
+  const rows: Row[] = metrics.map((m) => ({
+    m,
+    changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
+  }));
+  const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
 
   return (
     <section className="card">
@@ -80,26 +140,47 @@ export function HoldingsTable() {
             </colgroup>
             <thead>
               <tr>
-                <th>代號</th>
-                <th>現價</th>
-                <th>漲跌</th>
-                <th>數量</th>
-                <th>平均成本</th>
-                <th>市值</th>
-                <th>損益</th>
-                <th>損益率</th>
+                {(
+                  [
+                    ['symbol', '代號'],
+                    ['price', '現價'],
+                    ['change', '漲跌'],
+                    ['shares', '數量'],
+                    ['avgCost', '平均成本'],
+                    ['marketValue', '市值'],
+                    ['gainLoss', '損益'],
+                    ['gainLossPct', '損益率'],
+                  ] as [SortKey, string][]
+                ).map(([key, label]) => (
+                  <th key={key}>
+                    <button className="sort-header" onClick={() => handleSort(key)}>
+                      {label}
+                      <span className="sort-arrow">
+                        {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {metrics.map((m) => {
+              {sortedRows.map(({ m, changePercent }) => {
                 const isGain = m.gainLoss >= 0;
                 const isMenuOpen = openMenu?.id === m.holding.id;
-                const changePercent = m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined;
                 return (
                   <tr key={m.holding.id}>
-                    <td>
-                      {m.holding.symbol || '—'}
+                    <td>{m.holding.symbol || '—'}</td>
+                    <td>{formatDollar(m.currentPrice)}</td>
+                    <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
+                      {changePercent === undefined ? '—' : formatPercent(changePercent)}
+                    </td>
+                    <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
+                    <td>{formatDollar(m.holding.avgCost)}</td>
+                    <td>{formatDollar(m.marketValue)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatSignedNumber(m.gainLoss)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
+                    <td className="row-actions">
                       {m.holding.symbol && (
                         <a
                           className="news-link-icon"
@@ -111,17 +192,6 @@ export function HoldingsTable() {
                           📰
                         </a>
                       )}
-                    </td>
-                    <td>{formatDollar(m.currentPrice)}</td>
-                    <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
-                      {changePercent === undefined ? '—' : formatPercent(changePercent)}
-                    </td>
-                    <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
-                    <td>{formatDollar(m.holding.avgCost)}</td>
-                    <td>{formatDollar(m.marketValue)}</td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{formatSignedNumber(m.gainLoss)}</td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
-                    <td className="row-actions">
                       <button
                         className="btn btn-small btn-icon"
                         aria-label="更多操作"

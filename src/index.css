@@ -259,8 +259,36 @@ h3 {
 }
 
 .news-link-icon {
-  margin-left: 4px;
   text-decoration: none;
+}
+
+.sort-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  justify-content: flex-end;
+}
+
+th:first-child .sort-header,
+th:nth-child(2) .sort-header,
+th:nth-child(3) .sort-header {
+  justify-content: flex-start;
+}
+
+.sort-header:hover {
+  color: var(--text-h);
+}
+
+.sort-arrow {
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 .bubble-tooltip {

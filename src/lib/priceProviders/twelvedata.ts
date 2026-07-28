@@ -1,8 +1,10 @@
 import type { AssetClass } from '../../types';
 import { PriceFetchError } from './errors';
+import type { QuoteResult } from './index';
 
-interface TwelveDataPriceResponse {
-  price?: string;
+interface TwelveDataQuoteResponse {
+  close?: string;
+  percent_change?: string;
   code?: number;
   message?: string;
 }
@@ -24,11 +26,11 @@ function symbolForQuery(symbol: string, assetClass?: AssetClass): string {
   return symbol;
 }
 
-export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<number> {
+export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<QuoteResult> {
   const exchange = assetClass ? EXCHANGE_FOR_ASSET_CLASS[assetClass] : undefined;
   const exchangeParam = exchange ? `&exchange=${encodeURIComponent(exchange)}` : '';
   const querySymbol = symbolForQuery(symbol, assetClass);
-  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(querySymbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
+  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(querySymbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
   let response: Response;
   try {
     response = await fetch(url);
@@ -38,20 +40,21 @@ export async function fetchTwelveDataQuote(symbol: string, apiKey: string, asset
   if (!response.ok) {
     let detail = '';
     try {
-      const errJson = (await response.clone().json()) as TwelveDataPriceResponse;
+      const errJson = (await response.clone().json()) as TwelveDataQuoteResponse;
       detail = errJson.message ?? '';
     } catch {
       detail = await response.text().catch(() => '');
     }
     throw new PriceFetchError(`${symbol}：Twelve Data 回應錯誤（HTTP ${response.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`);
   }
-  const data = (await response.json()) as TwelveDataPriceResponse;
-  if (!data.price) {
+  const data = (await response.json()) as TwelveDataQuoteResponse;
+  if (!data.close) {
     throw new PriceFetchError(`${symbol}：${data.message ?? '找不到報價'}`);
   }
-  const price = Number(data.price);
+  const price = Number(data.close);
   if (Number.isNaN(price)) {
     throw new PriceFetchError(`${symbol}：Twelve Data 回傳的價格無法解析`);
   }
-  return price;
+  const changePercent = data.percent_change !== undefined ? Number(data.percent_change) : undefined;
+  return { price, changePercent: changePercent !== undefined && !Number.isNaN(changePercent) ? changePercent : undefined };
 }

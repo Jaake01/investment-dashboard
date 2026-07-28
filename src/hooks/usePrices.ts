@@ -86,8 +86,8 @@ export function usePrices() {
           const symbol = remainingSymbols[i];
           const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
           try {
-            const price = await provider.fetchQuote(symbol, settings.apiKey, assetClass);
-            fetchedEntries.push({ symbol, price, updatedAt: new Date().toISOString() });
+            const { price, changePercent } = await provider.fetchQuote(symbol, settings.apiKey, assetClass);
+            fetchedEntries.push({ symbol, price, changePercent, updatedAt: new Date().toISOString() });
           } catch (err) {
             fetchErrors.push(err instanceof PriceFetchError ? err.message : `${symbol}：報價失敗`);
           }

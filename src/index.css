@@ -9,8 +9,8 @@
   --border: #ddd3c0;
   --accent: #b06a45;
   --accent-hover: #96552f;
-  --gain: #7a8a5f;
-  --loss: #b1503c;
+  --gain: #1fa85a;
+  --loss: #f0421b;
   --danger: #a8452f;
   --danger-hover: #8f3a26;
 
@@ -32,8 +32,8 @@
     --border: #423c31;
     --accent: #d4915f;
     --accent-hover: #e2a374;
-    --gain: #9ab37c;
-    --loss: #d97b63;
+    --gain: #3adb6e;
+    --loss: #ff7a52;
     --danger: #d97b63;
     --danger-hover: #e28e77;
   }
@@ -51,8 +51,8 @@
   --border: #ddd3c0;
   --accent: #b06a45;
   --accent-hover: #96552f;
-  --gain: #7a8a5f;
-  --loss: #b1503c;
+  --gain: #1fa85a;
+  --loss: #f0421b;
   --danger: #a8452f;
   --danger-hover: #8f3a26;
 }
@@ -66,8 +66,8 @@
   --border: #423c31;
   --accent: #d4915f;
   --accent-hover: #e2a374;
-  --gain: #9ab37c;
-  --loss: #d97b63;
+  --gain: #3adb6e;
+  --loss: #ff7a52;
   --danger: #d97b63;
   --danger-hover: #e28e77;
 }
@@ -264,6 +264,30 @@ h3 {
 .news-load-more {
   display: block;
   margin: 16px auto 0;
+}
+
+.news-link-icon {
+  margin-left: 4px;
+  text-decoration: none;
+}
+
+.bubble-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(42, 38, 32, 0.12);
+  white-space: nowrap;
+}
+
+.bubble-tooltip strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-h);
 }
 
 .table-scroll {

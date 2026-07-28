@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PortfolioSummary } from './PortfolioSummary';
 import { CurrencyBreakdown } from './CurrencyBreakdown';
-import { AllocationTreemap } from './AllocationTreemap';
+import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
 import { NewsPanel } from './NewsPanel';
@@ -69,7 +69,7 @@ export function Layout() {
           <>
             <PortfolioSummary />
             <CurrencyBreakdown />
-            <AllocationTreemap />
+            <AllocationBubbleChart />
             <TrendChart />
             <HoldingsTable />
           </>

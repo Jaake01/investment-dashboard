@@ -24,7 +24,7 @@ export function useFxRate() {
     setIsRefreshing(true);
     setError('');
     try {
-      const usdToTwd = await fetchTwelveDataQuote('USD/TWD', settings.apiKey);
+      const { price: usdToTwd } = await fetchTwelveDataQuote('USD/TWD', settings.apiKey);
       setFxRate({ usdToTwd, updatedAt: new Date().toISOString(), source: 'auto' });
     } catch (err) {
       setError(err instanceof PriceFetchError ? err.message : '匯率刷新失敗');

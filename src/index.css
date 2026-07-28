@@ -271,6 +271,25 @@ h3 {
   text-decoration: none;
 }
 
+.bubble-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(42, 38, 32, 0.12);
+  white-space: nowrap;
+}
+
+.bubble-tooltip strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-h);
+}
+
 .table-scroll {
   overflow-x: auto;
 }

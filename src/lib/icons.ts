@@ -19,8 +19,7 @@ export function monogramFor(symbol: string): string {
 }
 
 // Deterministic color per symbol (not random) so the same holding always
-// gets the same badge color across renders/reloads. Matches the treemap's
-// vivid pastel palette (see AllocationTreemap's DRILL_COLORS).
+// gets the same badge color across renders/reloads.
 const MONOGRAM_COLORS = ['#4F9DDE', '#4CAF7D', '#E8735C', '#8B7FC7', '#D9A441', '#E07A9E', '#3FB6A8', '#F2955C'];
 
 export function monogramColorFor(symbol: string): string {

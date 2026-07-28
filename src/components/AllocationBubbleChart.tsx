@@ -1,0 +1,411 @@
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from 'react';
+import { usePortfolio } from '../context/PortfolioContext';
+import { useFxRate } from '../hooks/useFxRate';
+import {
+  computeAllocation,
+  computeDayChangePct,
+  computeHoldingMetrics,
+  computePreviousSymbolValue,
+  convertToTwd,
+  type HoldingMetrics,
+} from '../lib/calculations';
+import { formatCurrencyIn, formatPercent } from '../lib/format';
+import { monogramColorFor, monogramFor, realIconUrlFor } from '../lib/icons';
+import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency, type Snapshot } from '../types';
+
+// One base hue per asset class (matches the old treemap's CLASS_COLORS
+// family) — individual holdings within a class get a shade of that same
+// hue (see bubbleColorFor) so same-class bubbles read as related at a
+// glance while still being distinguishable from each other.
+const CLASS_HUE: Record<AssetClass, number> = {
+  us_stock: 205,
+  tw_stock: 150,
+  crypto: 10,
+  cash: 253,
+  other: 38,
+};
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function bubbleColorFor(assetClass: AssetClass, seed: string): string {
+  const hash = hashString(seed);
+  const hue = CLASS_HUE[assetClass] + ((hash % 13) - 6);
+  const saturation = 52 + ((hash >> 4) % 26);
+  const lightness = 40 + ((hash >> 9) % 20);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+interface BubbleIcon {
+  iconUrl: string | null;
+  monogram: string;
+  monogramColor: string;
+}
+
+interface BubbleDatum {
+  key: string;
+  name: string;
+  value: number;
+  percent: number;
+  percentLabel: string;
+  fill: string;
+  changePct: number | null;
+  icon: BubbleIcon | null;
+  assetClass: AssetClass;
+}
+
+function buildBubbleData(
+  metrics: HoldingMetrics[],
+  selectedClass: AssetClass | null,
+  usdToTwd: number | null,
+  snapshots: Snapshot[],
+): BubbleDatum[] {
+  const scoped = selectedClass ? metrics.filter((m) => m.holding.assetClass === selectedClass) : metrics;
+  const entries = scoped
+    .filter((m) => m.marketValue > 0)
+    .map((m) => ({
+      m,
+      // Combined view mixes currencies, so it converts to TWD (falling back
+      // to the native value when no FX rate is available yet, same as
+      // computeAllocation). A single-class view is already one currency.
+      value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, m.holding.assetClass, usdToTwd) ?? m.marketValue),
+    }));
+  const total = entries.reduce((sum, e) => sum + e.value, 0);
+  return entries
+    .map(({ m, value }) => {
+      const symbol = m.holding.symbol;
+      const percent = total > 0 ? (value / total) * 100 : 0;
+      const changePct = symbol ? computeDayChangePct(m.marketValue, computePreviousSymbolValue(snapshots, symbol)) : null;
+      return {
+        key: m.holding.id,
+        name: symbol || m.holding.name || '未命名',
+        value,
+        percent,
+        percentLabel: `${percent.toFixed(1)}%`,
+        fill: bubbleColorFor(m.holding.assetClass, symbol || m.holding.id),
+        changePct,
+        icon: symbol
+          ? { iconUrl: realIconUrlFor(symbol, m.holding.assetClass), monogram: monogramFor(symbol), monogramColor: monogramColorFor(symbol) }
+          : null,
+        assetClass: m.holding.assetClass,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+}
+
+interface BubbleNode extends BubbleDatum {
+  r: number;
+  x: number;
+  y: number;
+}
+
+// Compresses the size range so a small holding is still clearly visible next
+// to a large one (proportional, not to-scale) — a plain sqrt-of-value scale
+// would make the smallest slices disappear entirely.
+const SIZE_EXPONENT = 0.42;
+
+function layoutBubbles(data: BubbleDatum[], width: number, height: number): BubbleNode[] {
+  if (data.length === 0 || width <= 0 || height <= 0) return [];
+
+  const maxValue = Math.max(...data.map((d) => d.value), 1);
+  // Radius bounds shrink a bit as the bubble count grows, so a long holdings
+  // list still has a reasonable chance of fitting without heavy overlap.
+  const maxRadius = Math.max(24, Math.min(70, 300 / Math.sqrt(data.length)));
+  const minRadius = Math.max(12, maxRadius * 0.32);
+
+  const classesPresent = ASSET_CLASSES.filter((c) => data.some((d) => d.assetClass === c));
+  const centerX = width / 2;
+  const centerY = height / 2;
+  // Elliptical (not circular) spread so cluster anchors actually use a wide
+  // canvas's width instead of bunching into a small circle in the middle.
+  const spreadX = width * 0.32;
+  const spreadY = height * 0.3;
+  const anchors: Partial<Record<AssetClass, { x: number; y: number }>> = {};
+  classesPresent.forEach((c, i) => {
+    const angle = (i / classesPresent.length) * Math.PI * 2 - Math.PI / 2;
+    anchors[c] = classesPresent.length === 1
+      ? { x: centerX, y: centerY }
+      : { x: centerX + spreadX * Math.cos(angle), y: centerY + spreadY * Math.sin(angle) };
+  });
+
+  const nodes: BubbleNode[] = data.map((d) => {
+    const t = Math.pow(d.value / maxValue, SIZE_EXPONENT);
+    const r = minRadius + t * (maxRadius - minRadius);
+    const anchor = anchors[d.assetClass] ?? { x: centerX, y: centerY };
+    const jitterAngle = Math.random() * Math.PI * 2;
+    const jitterR = Math.random() * 30;
+    return {
+      ...d,
+      r,
+      x: anchor.x + Math.cos(jitterAngle) * jitterR,
+      y: anchor.y + Math.sin(jitterAngle) * jitterR,
+    };
+  });
+
+  const padding = 3;
+  const pull = 0.06;
+  const iterations = 260;
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        const minDist = a.r + b.r + padding;
+        if (dist < minDist) {
+          if (dist === 0) {
+            dx = Math.random() - 0.5;
+            dy = Math.random() - 0.5;
+            dist = 0.01;
+          }
+          const overlap = (minDist - dist) / 2;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          a.x -= nx * overlap;
+          a.y -= ny * overlap;
+          b.x += nx * overlap;
+          b.y += ny * overlap;
+        }
+      }
+    }
+    for (const n of nodes) {
+      const anchor = anchors[n.assetClass] ?? { x: centerX, y: centerY };
+      n.x += (anchor.x - n.x) * pull;
+      n.y += (anchor.y - n.y) * pull;
+    }
+    for (const n of nodes) {
+      n.x = Math.min(width - n.r, Math.max(n.r, n.x));
+      n.y = Math.min(height - n.r, Math.max(n.r, n.y));
+    }
+  }
+
+  return nodes;
+}
+
+let measureCanvas: HTMLCanvasElement | null = null;
+function measureTextWidth(text: string, fontSize: number, fontWeight: number): number {
+  if (typeof document === 'undefined') return text.length * fontSize * 0.6;
+  if (!measureCanvas) measureCanvas = document.createElement('canvas');
+  const ctx = measureCanvas.getContext('2d');
+  if (!ctx) return text.length * fontSize * 0.6;
+  ctx.font = `${fontWeight} ${fontSize}px sans-serif`;
+  return ctx.measureText(text).width;
+}
+
+const MIN_FONT_SIZE = 9;
+const MAX_NAME_FONT_SIZE = 22;
+
+// Largest font size (down to MIN_FONT_SIZE) at which `text` still fits
+// within maxWidth; 0 if it doesn't fit even at the minimum.
+function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: number): number {
+  for (let size = maxSize; size >= MIN_FONT_SIZE; size -= 1) {
+    if (measureTextWidth(text, size, weight) <= maxWidth) return size;
+  }
+  return 0;
+}
+
+const MIN_RADIUS_FOR_ICON = 34;
+const MIN_ICON_SIZE = 18;
+const MAX_ICON_SIZE = 34;
+const ICON_GAP = 4;
+
+function BubbleContent({ node }: { node: BubbleNode }) {
+  const { x, y, r, name, percentLabel, percent, icon } = node;
+  const maxTextWidth = r * 1.6;
+
+  const desiredNameSize = Math.min(MAX_NAME_FONT_SIZE, MIN_FONT_SIZE + (percent / 100) * 70);
+  const nameFontSize = fitFontSize(name, desiredNameSize, maxTextWidth, 600);
+  const percentFontSize = nameFontSize > 0 ? fitFontSize(percentLabel, Math.round(nameFontSize * 0.72), maxTextWidth, 400) : 0;
+  const iconSize = icon && r >= MIN_RADIUS_FOR_ICON ? Math.min(MAX_ICON_SIZE, Math.max(MIN_ICON_SIZE, r * 0.55)) : 0;
+
+  const lineGap = 2;
+  const diameter = r * 2;
+  const showIcon = iconSize > 0 && diameter > iconSize + ICON_GAP + nameFontSize + 8;
+  const showName = nameFontSize > 0 && diameter > nameFontSize + 8;
+  const showPercent =
+    showName && percentFontSize > 0 && diameter > (showIcon ? iconSize + ICON_GAP : 0) + nameFontSize + percentFontSize + lineGap + 8;
+
+  const contentHeight = (showIcon ? iconSize + ICON_GAP : 0) + (showName ? nameFontSize : 0) + (showPercent ? percentFontSize + lineGap : 0);
+  const topY = y - contentHeight / 2;
+  const iconCy = topY + iconSize / 2;
+  const nameY = topY + (showIcon ? iconSize + ICON_GAP : 0) + nameFontSize / 2;
+  const percentY = nameY + nameFontSize / 2 + lineGap + percentFontSize / 2;
+  const clipId = `bubble-icon-clip-${node.key}`;
+
+  return (
+    <g>
+      <circle cx={x} cy={y} r={r} style={{ fill: node.fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
+      {showIcon && icon && (
+        <>
+          <circle cx={x} cy={iconCy} r={iconSize / 2} fill={icon.monogramColor} />
+          <text x={x} y={iconCy} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={iconSize * 0.4} fontWeight={700}>
+            {icon.monogram}
+          </text>
+          {icon.iconUrl && (
+            <>
+              <clipPath id={clipId}>
+                <circle cx={x} cy={iconCy} r={iconSize / 2} />
+              </clipPath>
+              <image
+                x={x - iconSize / 2}
+                y={iconCy - iconSize / 2}
+                width={iconSize}
+                height={iconSize}
+                href={icon.iconUrl}
+                clipPath={`url(#${clipId})`}
+                onError={(e) => {
+                  (e.currentTarget as SVGImageElement).style.display = 'none';
+                }}
+              />
+            </>
+          )}
+        </>
+      )}
+      {showName && (
+        <text x={x} y={nameY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={nameFontSize} fontWeight={600}>
+          {name}
+        </text>
+      )}
+      {showPercent && (
+        <text x={x} y={percentY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={percentFontSize} opacity={0.9}>
+          {percentLabel}
+        </text>
+      )}
+    </g>
+  );
+}
+
+interface TooltipState {
+  datum: BubbleDatum;
+  left: number;
+  top: number;
+}
+
+const CHART_HEIGHT = 360;
+
+// recharts v3's ResponsiveContainer only measures/sizes actual recharts chart
+// components (via an internal context), not arbitrary children — so a
+// custom SVG chart like this one needs its own resize measurement instead.
+function useContainerWidth(ref: RefObject<HTMLDivElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setWidth(entry.contentRect.width);
+    });
+    setWidth(el.getBoundingClientRect().width);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
+function BubbleChartSvg({
+  width,
+  height,
+  data,
+  currency,
+}: {
+  width: number;
+  height: number;
+  data: BubbleDatum[];
+  currency: Currency;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const nodes = useMemo(() => layoutBubbles(data, width, height), [data, width, height]);
+
+  const showTooltip = (e: MouseEvent, datum: BubbleDatum) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltip({ datum, left: e.clientX - rect.left, top: e.clientY - rect.top });
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <svg width={width} height={height}>
+        {nodes.map((n) => (
+          <g
+            key={n.key}
+            onMouseEnter={(e) => showTooltip(e, n)}
+            onMouseMove={(e) => showTooltip(e, n)}
+            onMouseLeave={() => setTooltip(null)}
+          >
+            <BubbleContent node={n} />
+          </g>
+        ))}
+      </svg>
+      {tooltip && (
+        <div className="bubble-tooltip" style={{ left: tooltip.left + 12, top: tooltip.top + 12 }}>
+          <strong>{tooltip.datum.name}</strong>
+          <div>
+            {formatCurrencyIn(tooltip.datum.value, currency)}（{tooltip.datum.percentLabel}
+            {tooltip.datum.changePct != null ? `，較昨日 ${formatPercent(tooltip.datum.changePct)}` : ''}）
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AllocationBubbleChart() {
+  const { holdings, prices, snapshots } = usePortfolio();
+  const { effectiveUsdToTwd } = useFxRate();
+  const [selectedClass, setSelectedClass] = useState<AssetClass | null>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const width = useContainerWidth(measureRef);
+
+  const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
+  const topLevel = computeAllocation(metrics, 'assetClass', effectiveUsdToTwd);
+
+  const data = buildBubbleData(metrics, selectedClass, effectiveUsdToTwd, snapshots);
+  const isEmpty = data.length === 0;
+  const currency = selectedClass ? CURRENCY_FOR_ASSET_CLASS[selectedClass] : 'TWD';
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <h2>資產配置{selectedClass ? `（${ASSET_CLASS_LABELS[selectedClass]}）` : ''}</h2>
+      </div>
+
+      <div className="tab-bar">
+        <button
+          className={`tab-button ${selectedClass === null ? 'active' : ''}`}
+          onClick={() => setSelectedClass(null)}
+        >
+          總覽
+        </button>
+        {topLevel.map((s) => (
+          <button
+            key={s.key}
+            className={`tab-button ${selectedClass === s.key ? 'active' : ''}`}
+            onClick={() => setSelectedClass(s.key as AssetClass)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {isEmpty ? (
+        <p className="empty-state">
+          {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
+        </p>
+      ) : (
+        <div ref={measureRef} style={{ width: '100%', height: CHART_HEIGHT }}>
+          {width > 0 && <BubbleChartSvg data={data} currency={currency} width={width} height={CHART_HEIGHT} />}
+        </div>
+      )}
+
+      {!selectedClass && effectiveUsdToTwd === null && topLevel.length > 0 && (
+        <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>
+      )}
+    </section>
+  );
+}

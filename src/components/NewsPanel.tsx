@@ -1,8 +1,5 @@
-import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { useNews } from '../hooks/useNews';
-
-type NewsTab = 'trending' | 'holdings';
 
 function formatPublishedAt(iso: string): string {
   const d = new Date(iso);
@@ -11,41 +8,17 @@ function formatPublishedAt(iso: string): string {
 }
 
 export function NewsPanel() {
-  const { settings, holdings } = usePortfolio();
-  const {
-    trendingNews,
-    holdingsNews,
-    trendingHasMore,
-    holdingsHasMore,
-    isLoading,
-    isLoadingMore,
-    error,
-    refresh,
-    loadMoreTrending,
-    loadMoreHoldings,
-  } = useNews();
-  const [tab, setTab] = useState<NewsTab>('trending');
+  const { settings } = usePortfolio();
+  const { news, hasMore, isLoading, isLoadingMore, error, refresh, loadMore } = useNews();
 
   const hasApiKey = settings.marketauxApiKey.trim().length > 0;
-  const items = tab === 'trending' ? trendingNews : holdingsNews;
-  const hasMore = tab === 'trending' ? trendingHasMore : holdingsHasMore;
-  const loadMore = tab === 'trending' ? loadMoreTrending : loadMoreHoldings;
 
   return (
     <section className="card">
       <div className="card-header">
-        <h2>新聞</h2>
+        <h2>最新新聞</h2>
         <button className="btn" onClick={refresh} disabled={isLoading || !hasApiKey}>
           {isLoading ? '讀取中…' : '重新整理'}
-        </button>
-      </div>
-
-      <div className="tab-bar">
-        <button className={`tab-button ${tab === 'trending' ? 'active' : ''}`} onClick={() => setTab('trending')}>
-          熱門市場新聞
-        </button>
-        <button className={`tab-button ${tab === 'holdings' ? 'active' : ''}`} onClick={() => setTab('holdings')}>
-          持股相關新聞
         </button>
       </div>
 
@@ -53,14 +26,12 @@ export function NewsPanel() {
         <p className="empty-state">請先到設定填入 Marketaux API key。</p>
       ) : error ? (
         <p className="form-error">{error}</p>
-      ) : tab === 'holdings' && holdings.length === 0 ? (
-        <p className="empty-state">尚未有持股，無法抓取相關新聞。</p>
-      ) : items.length === 0 ? (
+      ) : news.length === 0 ? (
         <p className="empty-state">{isLoading ? '讀取中…' : '目前沒有新聞可顯示。'}</p>
       ) : (
         <>
           <ul className="news-list">
-            {items.map((item) => (
+            {news.map((item) => (
               <li className="news-item" key={item.id}>
                 <a href={item.url} target="_blank" rel="noreferrer" className="news-item-title">
                   {item.title}

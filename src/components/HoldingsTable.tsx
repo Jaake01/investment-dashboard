@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { computeHoldingMetrics } from '../lib/calculations';
-import { formatDollar, formatNumber, formatPercent, googleNewsUrlFor } from '../lib/format';
+import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
 import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
@@ -112,18 +112,15 @@ export function HoldingsTable() {
                         </a>
                       )}
                     </td>
-                    <td>
-                      {formatDollar(m.currentPrice)}
-                      {!m.priceIsLive && m.holding.symbol && <span className="badge">成本價</span>}
-                    </td>
+                    <td>{formatDollar(m.currentPrice)}</td>
                     <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
                       {changePercent === undefined ? '—' : formatPercent(changePercent)}
                     </td>
-                    <td>{formatNumber(m.holding.shares)}</td>
+                    <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
                     <td>{formatDollar(m.holding.avgCost)}</td>
                     <td>{formatDollar(m.marketValue)}</td>
-                    <td className={isGain ? 'gain' : 'loss'}>{formatDollar(m.gainLoss)}</td>
-                    <td className={isGain ? 'gain' : 'loss'}>{formatPercent(m.gainLossPct)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatSignedNumber(m.gainLoss)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
                       <button
                         className="btn btn-small btn-icon"

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
+import { useAuth } from '../context/AuthContext';
+import { isFirebaseConfigured } from '../lib/firebase';
 import { CsvImportError, fetchAndParseSheet } from '../lib/csv';
 import { PRICE_PROVIDERS } from '../lib/priceProviders';
 import { usePrices } from '../hooks/usePrices';
@@ -8,6 +10,11 @@ import { useAutoSync } from '../hooks/useAutoSync';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { activeApiKeyFor, type ImportedHoldingRow, type PriceProviderId, type Theme } from '../types';
 
+const SYNC_STATUS_LABELS: Record<string, string> = {
+  idle: '已同步',
+  syncing: '同步中…',
+};
+
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'light', label: '淺色' },
   { value: 'dark', label: '深色' },
@@ -15,7 +22,8 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 ];
 
 export function SettingsPanel() {
-  const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport } = usePortfolio();
+  const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, syncStatus, syncError } = usePortfolio();
+  const { user, loading: authLoading, signInError, signInWithGoogle, signOutUser } = useAuth();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
   const { error: autoSyncError } = useAutoSync();
@@ -45,6 +53,39 @@ export function SettingsPanel() {
   return (
     <section className="card">
       <h2>設定</h2>
+
+      {isFirebaseConfigured && (
+        <div className="settings-group">
+          <h3>帳號同步</h3>
+          {authLoading ? (
+            <p className="settings-hint">讀取登入狀態…</p>
+          ) : user ? (
+            <>
+              <div className="settings-row">
+                <span className="settings-hint" style={{ margin: 0 }}>
+                  已登入：{user.email}
+                </span>
+                <button className="btn" onClick={signOutUser}>
+                  登出
+                </button>
+              </div>
+              <p className="settings-hint">
+                {syncStatus === 'error' ? `同步失敗：${syncError}` : (SYNC_STATUS_LABELS[syncStatus] ?? '尚未開始同步')}
+              </p>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-primary" onClick={signInWithGoogle}>
+                使用 Google 登入
+              </button>
+              <p className="settings-hint">
+                登入後，持股清單、設定（API key 除外）與歷史趨勢會同步到你的 Google 帳號，其他裝置登入同一個帳號即可看到一致的資料。不登入完全不影響現有功能，資料只存在這台裝置。
+              </p>
+              {signInError && <p className="form-error">{signInError}</p>}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="settings-group">
         <h3>外觀</h3>

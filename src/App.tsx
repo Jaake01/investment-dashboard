@@ -1,11 +1,14 @@
+import { AuthProvider } from './context/AuthContext';
 import { PortfolioProvider } from './context/PortfolioContext';
 import { Layout } from './components/Layout';
 
 function App() {
   return (
-    <PortfolioProvider>
-      <Layout />
-    </PortfolioProvider>
+    <AuthProvider>
+      <PortfolioProvider>
+        <Layout />
+      </PortfolioProvider>
+    </AuthProvider>
   );
 }
 

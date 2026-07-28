@@ -68,6 +68,18 @@ export function activeApiKeyFor(settings: Settings): string {
   return '';
 }
 
+// The API key fields are real secrets — Firestore security rules only gate
+// client access, not the project owner's own Console/admin access, so these
+// three never leave the browser. Everything else in Settings is safe to sync.
+const NON_SYNCABLE_SETTINGS_KEYS = ['finnhubApiKey', 'twelveDataApiKey', 'marketauxApiKey'] as const;
+export type SyncableSettings = Omit<Settings, (typeof NON_SYNCABLE_SETTINGS_KEYS)[number]>;
+
+export function toSyncableSettings(settings: Settings): SyncableSettings {
+  const copy: Partial<Settings> = { ...settings };
+  for (const key of NON_SYNCABLE_SETTINGS_KEYS) delete copy[key];
+  return copy as SyncableSettings;
+}
+
 export interface PriceEntry {
   symbol: string;
   price: number;

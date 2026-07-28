@@ -1,10 +1,11 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useCloudSync, type SyncStatus } from '../hooks/useCloudSync';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
 import { recordSnapshot } from '../hooks/useSnapshots';
-import { mergeSnapshots } from '../lib/calculations';
+import { mergeSnapshots, todayDateString } from '../lib/calculations';
 import { DEFAULT_SHEET_URL } from '../lib/config';
 
 // Pre-filled with the owner's own published sheet so the dashboard connects
@@ -31,6 +32,8 @@ interface PortfolioContextValue {
   prices: Record<string, PriceEntry>;
   snapshots: Snapshot[];
   fxRate: FxRate | null;
+  syncStatus: SyncStatus;
+  syncError: string | null;
   addHolding: (input: NewHoldingInput) => void;
   updateHolding: (id: string, patch: Partial<NewHoldingInput>) => void;
   deleteHolding: (id: string) => void;
@@ -81,37 +84,47 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>(storageKey('snapshots'), []);
   const [fxRate, setFxRateState] = useLocalStorage<FxRate | null>(storageKey('fxRate'), null);
 
+  const cloudSync = useCloudSync({ holdings, setHoldings, settings, setSettingsState, snapshots, setSnapshots });
+
   const value = useMemo<PortfolioContextValue>(() => ({
     holdings,
     settings,
     prices,
     snapshots,
     fxRate,
+    syncStatus: cloudSync.syncStatus,
+    syncError: cloudSync.syncError,
 
     addHolding: (input) => {
-      setHoldings([...holdings, { ...input, id: newId(), source: 'manual' }]);
+      const holding: Holding = { ...input, id: newId(), source: 'manual' };
+      setHoldings((prev) => [...prev, holding]);
+      cloudSync.pushHolding(holding);
     },
 
     updateHolding: (id, patch) => {
-      setHoldings(holdings.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+      const current = holdings.find((h) => h.id === id);
+      setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+      if (current) cloudSync.pushHolding({ ...current, ...patch });
     },
 
     deleteHolding: (id) => {
-      setHoldings(holdings.filter((h) => h.id !== id));
+      setHoldings((prev) => prev.filter((h) => h.id !== id));
+      cloudSync.pushHoldingDelete(id);
     },
 
     replaceHoldingsFromImport: (rows) => {
-      setHoldings(
-        rows.map((row) => ({
-          id: newId(),
-          symbol: row.symbol,
-          name: row.name,
-          shares: row.shares,
-          avgCost: row.avgCost,
-          assetClass: row.assetClass,
-          source: 'import',
-        })),
-      );
+      const next: Holding[] = rows.map((row) => ({
+        id: newId(),
+        symbol: row.symbol,
+        name: row.name,
+        shares: row.shares,
+        avgCost: row.avgCost,
+        assetClass: row.assetClass,
+        source: 'import',
+      }));
+      const removedIds = holdings.map((h) => h.id);
+      setHoldings(next);
+      cloudSync.pushHoldingsReplace(next, removedIds);
     },
 
     mergeHoldingsFromImport: (rows) => {
@@ -139,32 +152,42 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         }
       }
       setHoldings(next);
+      cloudSync.pushHoldingsReplace(next, []);
     },
 
     setSettings: (patch) => {
-      setSettingsState({ ...settings, ...patch });
+      const next = { ...settings, ...patch };
+      setSettingsState(next);
+      cloudSync.pushSettings(next);
     },
 
     applyPriceUpdates: (entries) => {
-      const next = { ...prices };
-      for (const entry of entries) {
-        next[entry.symbol] = entry;
-      }
-      setPrices(next);
+      setPrices((prev) => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          next[entry.symbol] = entry;
+        }
+        return next;
+      });
     },
 
     recordCurrentSnapshot: (totalValue, classValues, symbolValues) => {
       setSnapshots(recordSnapshot(snapshots, totalValue, classValues, symbolValues));
+      cloudSync.pushSnapshot({ date: todayDateString(), totalValue, classValues, symbolValues });
     },
 
     mergeRemoteSnapshots: (remote) => {
-      setSnapshots(mergeSnapshots(snapshots, remote));
+      const priorDates = new Set(snapshots.map((s) => s.date));
+      const merged = mergeSnapshots(snapshots, remote);
+      setSnapshots(merged);
+      const newlyAdded = merged.filter((s) => !priorDates.has(s.date));
+      for (const s of newlyAdded) cloudSync.pushSnapshot(s);
     },
 
     setFxRate: (rate) => {
       setFxRateState(rate);
     },
-  }), [holdings, settings, prices, snapshots, fxRate, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState]);
+  }), [holdings, settings, prices, snapshots, fxRate, cloudSync, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
 }

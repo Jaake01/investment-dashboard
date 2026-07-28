@@ -25,6 +25,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Not secret by Firebase's design (identifies the project, doesn't
+          # grant access — that's Firestore Security Rules + Auth), hence
+          # Variables rather than Secrets. Cross-device sync is optional: if
+          # these are unset, the build still succeeds and the app just runs
+          # in its local-only mode (see src/lib/firebase.ts).
+          VITE_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -465,15 +465,21 @@ export function AllocationBubbleChart() {
         ))}
       </div>
 
-      {isEmpty ? (
-        <p className="empty-state">
-          {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
-        </p>
-      ) : (
-        <div ref={measureRef} style={{ width: '100%', height: CHART_HEIGHT }}>
-          {width > 0 && <BubbleChartSvg data={data} currency={currency} width={width} height={CHART_HEIGHT} />}
-        </div>
-      )}
+      {/* Always mounted (even when empty) so the ResizeObserver in
+          useContainerWidth — which only attaches once, on mount — keeps
+          watching the same node. Unmounting/remounting this div (e.g. by
+          conditionally rendering it only when non-empty) left the observer
+          watching a detached node after switching away from and back to a
+          class with data, so the chart would silently stay blank. */}
+      <div ref={measureRef} style={{ width: '100%', minHeight: isEmpty ? undefined : CHART_HEIGHT }}>
+        {isEmpty ? (
+          <p className="empty-state">
+            {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
+          </p>
+        ) : (
+          width > 0 && <BubbleChartSvg data={data} currency={currency} width={width} height={CHART_HEIGHT} />
+        )}
+      </div>
 
       {!selectedClass && effectiveUsdToTwd === null && !isEmpty && (
         <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>

@@ -37,13 +37,13 @@ export function PortfolioSummary() {
         </div>
         <div className="summary-stat">
           <span className="summary-label">總損益</span>
-          <span className={`summary-value ${totalGainLoss !== null ? (isGain ? 'gain' : 'loss') : ''}`}>
+          <span className={`summary-value ${totalGainLoss !== null ? (isGain ? 'change-up' : 'change-down') : ''}`}>
             {totalGainLoss === null ? placeholder : formatCurrencyIn(totalGainLoss, 'TWD')}
           </span>
         </div>
         <div className="summary-stat">
           <span className="summary-label">報酬率</span>
-          <span className={`summary-value ${totalGainLoss !== null ? (isGain ? 'gain' : 'loss') : ''}`}>
+          <span className={`summary-value ${totalGainLoss !== null ? (isGain ? 'change-up' : 'change-down') : ''}`}>
             {totalGainLoss === null ? placeholder : formatPercent(totalGainLossPct)}
           </span>
         </div>

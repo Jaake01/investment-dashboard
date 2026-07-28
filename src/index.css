@@ -196,15 +196,7 @@ h3 {
   color: var(--text-h);
 }
 
-.gain {
-  color: var(--gain);
-}
-
-.loss {
-  color: var(--loss);
-}
-
-/* Taiwan market convention (opposite of .gain/.loss above): up is red, down is green. */
+/* Taiwan market convention: up is red, down is green. */
 .change-up {
   color: var(--loss);
 }

@@ -80,19 +80,14 @@ async function fetchMarketaux(params: Record<string, string>): Promise<NewsPage>
   return { items, hasMore };
 }
 
-// General financial headlines — Marketaux doesn't expose a true "trending by
-// attention" ranking on the free tier, so this is its default relevance/
-// recency-sorted feed rather than a literal popularity ranking.
-export async function fetchTrendingNews(apiKey: string, page = 1): Promise<NewsPage> {
-  return fetchMarketaux({ api_token: apiKey, language: 'en,zh', limit: String(PAGE_SIZE), page: String(page) });
-}
-
-export async function fetchHoldingsNews(apiKey: string, symbols: string[], page = 1): Promise<NewsPage> {
-  if (symbols.length === 0) return { items: [], hasMore: false };
+// General financial headlines, newest first (`sort=published_desc` —
+// Marketaux's default without an explicit sort leans toward relevance, not
+// strictly recency).
+export async function fetchLatestNews(apiKey: string, page = 1): Promise<NewsPage> {
   return fetchMarketaux({
     api_token: apiKey,
-    symbols: symbols.join(','),
     language: 'en,zh',
+    sort: 'published_desc',
     limit: String(PAGE_SIZE),
     page: String(page),
   });

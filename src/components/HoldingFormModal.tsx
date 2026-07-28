@@ -69,7 +69,7 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
         <form onSubmit={handleSubmit}>
           <label>
             代號
-            <input value={symbol} onChange={(e) => handleSymbolChange(e.target.value)} placeholder="AAPL" />
+            <input value={symbol} onChange={(e) => handleSymbolChange(e.target.value)} placeholder="例如 AAPL" />
           </label>
           <label>
             股數

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject }
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import {
-  computeAllocation,
   computeDayChangePct,
   computeHoldingMetrics,
   computePreviousSymbolValue,
@@ -117,7 +116,7 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   // Radius bounds shrink a bit as the bubble count grows, so a long holdings
   // list still has a reasonable chance of fitting without heavy overlap.
   const maxRadius = Math.max(28, Math.min(85, 360 / Math.sqrt(data.length)));
-  const minRadius = Math.max(14, maxRadius * 0.32);
+  const minRadius = Math.max(19, maxRadius * 0.32);
 
   const classesPresent = ASSET_CLASSES.filter((c) => data.some((d) => d.assetClass === c));
   const centerX = width / 2;
@@ -150,9 +149,9 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
     };
   });
 
-  const padding = 3;
-  const pull = 0.06;
-  const iterations = 260;
+  const padding = 6;
+  const pull = 0.045;
+  const iterations = 360;
   for (let iter = 0; iter < iterations; iter++) {
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -217,29 +216,71 @@ function fitFontSize(text: string, maxSize: number, maxWidth: number, weight: nu
 const MIN_RADIUS_FOR_ICON = 34;
 const MIN_ICON_SIZE = 18;
 const MAX_ICON_SIZE = 34;
-const ICON_GAP = 4;
+const LINE_GAP = 2;
+
+// A thin dark outline behind the white labels so they stay legible against
+// the full range of bubble hues/lightnesses, not just the darker ones.
+const TEXT_OUTLINE = { stroke: 'rgba(0,0,0,0.55)', paintOrder: 'stroke' } as const;
+
+interface TextLine {
+  type: 'icon' | 'name' | 'percent';
+  size: number;
+}
+
+// Tries content combos from most to least complete, in priority order —
+// the percent figure is what the chart is actually for, so it's the last
+// thing to get dropped; the icon (purely decorative) is the first.
+function pickLines(diameter: number, icon: number, name: number, percent: number): TextLine[] {
+  const combos: Array<[boolean, boolean, boolean]> = [
+    [true, true, true],
+    [false, true, true],
+    [true, false, true],
+    [false, false, true],
+    [false, true, false],
+  ];
+  for (const [wantIcon, wantName, wantPercent] of combos) {
+    const lines: TextLine[] = [];
+    if (wantIcon && icon > 0) lines.push({ type: 'icon', size: icon });
+    if (wantName && name > 0) lines.push({ type: 'name', size: name });
+    if (wantPercent && percent > 0) lines.push({ type: 'percent', size: percent });
+    // A combo can silently lose a part if its size was 0 (didn't fit at all) —
+    // only accept it if every part we asked for actually made it in.
+    const gotIcon = !wantIcon || icon > 0;
+    const gotName = !wantName || name > 0;
+    const gotPercent = !wantPercent || percent > 0;
+    if (!(gotIcon && gotName && gotPercent) || lines.length === 0) continue;
+    const height = lines.reduce((sum, l) => sum + l.size, 0) + (lines.length - 1) * LINE_GAP;
+    if (height <= diameter - 8) return lines;
+  }
+  return [];
+}
 
 function BubbleContent({ node }: { node: BubbleNode }) {
   const { x, y, r, name, percentLabel, percent, icon } = node;
-  const maxTextWidth = r * 1.6;
+  const maxTextWidth = r * 1.7;
+  const diameter = r * 2;
 
   const desiredNameSize = Math.min(MAX_NAME_FONT_SIZE, MIN_FONT_SIZE + (percent / 100) * 70);
   const nameFontSize = fitFontSize(name, desiredNameSize, maxTextWidth, 600);
-  const percentFontSize = nameFontSize > 0 ? fitFontSize(percentLabel, Math.round(nameFontSize * 0.72), maxTextWidth, 400) : 0;
+  const desiredPercentSize = Math.min(MAX_NAME_FONT_SIZE - 2, MIN_FONT_SIZE + (percent / 100) * 55);
+  const percentFontSize = fitFontSize(percentLabel, desiredPercentSize, maxTextWidth, 700);
   const iconSize = icon && r >= MIN_RADIUS_FOR_ICON ? Math.min(MAX_ICON_SIZE, Math.max(MIN_ICON_SIZE, r * 0.55)) : 0;
 
-  const lineGap = 2;
-  const diameter = r * 2;
-  const showIcon = iconSize > 0 && diameter > iconSize + ICON_GAP + nameFontSize + 8;
-  const showName = nameFontSize > 0 && diameter > nameFontSize + 8;
-  const showPercent =
-    showName && percentFontSize > 0 && diameter > (showIcon ? iconSize + ICON_GAP : 0) + nameFontSize + percentFontSize + lineGap + 8;
+  const lines = pickLines(diameter, iconSize, nameFontSize, percentFontSize);
+  const showIcon = lines.some((l) => l.type === 'icon');
+  const showName = lines.some((l) => l.type === 'name');
+  const showPercent = lines.some((l) => l.type === 'percent');
 
-  const contentHeight = (showIcon ? iconSize + ICON_GAP : 0) + (showName ? nameFontSize : 0) + (showPercent ? percentFontSize + lineGap : 0);
-  const topY = y - contentHeight / 2;
-  const iconCy = topY + iconSize / 2;
-  const nameY = topY + (showIcon ? iconSize + ICON_GAP : 0) + nameFontSize / 2;
-  const percentY = nameY + nameFontSize / 2 + lineGap + percentFontSize / 2;
+  const contentHeight = lines.reduce((sum, l) => sum + l.size, 0) + (lines.length - 1) * LINE_GAP;
+  let cursorY = y - contentHeight / 2;
+  const centerYFor: Partial<Record<TextLine['type'], number>> = {};
+  for (const line of lines) {
+    centerYFor[line.type] = cursorY + line.size / 2;
+    cursorY += line.size + LINE_GAP;
+  }
+  const iconCy = centerYFor.icon ?? y;
+  const nameY = centerYFor.name ?? y;
+  const percentY = centerYFor.percent ?? y;
   const clipId = `bubble-icon-clip-${node.key}`;
 
   return (
@@ -272,12 +313,32 @@ function BubbleContent({ node }: { node: BubbleNode }) {
         </>
       )}
       {showName && (
-        <text x={x} y={nameY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={nameFontSize} fontWeight={600}>
+        <text
+          x={x}
+          y={nameY}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#fff"
+          fontSize={nameFontSize}
+          fontWeight={600}
+          strokeWidth={Math.max(2, nameFontSize * 0.12)}
+          {...TEXT_OUTLINE}
+        >
           {name}
         </text>
       )}
       {showPercent && (
-        <text x={x} y={percentY} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={percentFontSize} opacity={0.9}>
+        <text
+          x={x}
+          y={percentY}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#fff"
+          fontSize={percentFontSize}
+          fontWeight={showName ? 400 : 700}
+          strokeWidth={Math.max(1.5, percentFontSize * 0.12)}
+          {...TEXT_OUTLINE}
+        >
           {percentLabel}
         </text>
       )}
@@ -360,6 +421,11 @@ function BubbleChartSvg({
   );
 }
 
+// Fixed tab list (matches HoldingsTable's BASE_TABS) so the class switcher
+// doesn't appear/disappear as holdings change — 'other' only shows up once
+// it's actually used, same as there.
+const BASE_CLASS_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
+
 export function AllocationBubbleChart() {
   const { holdings, prices, snapshots } = usePortfolio();
   const { effectiveUsdToTwd } = useFxRate();
@@ -368,7 +434,8 @@ export function AllocationBubbleChart() {
   const width = useContainerWidth(measureRef);
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
-  const topLevel = computeAllocation(metrics, 'assetClass', effectiveUsdToTwd);
+  const hasOther = holdings.some((h) => h.assetClass === 'other');
+  const classTabs = hasOther ? [...BASE_CLASS_TABS, 'other' as AssetClass] : BASE_CLASS_TABS;
 
   const data = buildBubbleData(metrics, selectedClass, effectiveUsdToTwd, snapshots);
   const isEmpty = data.length === 0;
@@ -387,13 +454,13 @@ export function AllocationBubbleChart() {
         >
           總覽
         </button>
-        {topLevel.map((s) => (
+        {classTabs.map((c) => (
           <button
-            key={s.key}
-            className={`tab-button ${selectedClass === s.key ? 'active' : ''}`}
-            onClick={() => setSelectedClass(s.key as AssetClass)}
+            key={c}
+            className={`tab-button ${selectedClass === c ? 'active' : ''}`}
+            onClick={() => setSelectedClass(c)}
           >
-            {s.label}
+            {ASSET_CLASS_LABELS[c]}
           </button>
         ))}
       </div>
@@ -408,7 +475,7 @@ export function AllocationBubbleChart() {
         </div>
       )}
 
-      {!selectedClass && effectiveUsdToTwd === null && topLevel.length > 0 && (
+      {!selectedClass && effectiveUsdToTwd === null && !isEmpty && (
         <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>
       )}
     </section>

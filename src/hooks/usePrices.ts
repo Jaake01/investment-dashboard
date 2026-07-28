@@ -5,7 +5,7 @@ import { computeClassValues, computeHoldingMetrics, computeSymbolValues, compute
 import { CsvImportError } from '../lib/csv';
 import { fetchQuoteSheet } from '../lib/quoteSheet';
 import { useFxRate } from './useFxRate';
-import type { PriceEntry } from '../types';
+import { activeApiKeyFor, type PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
 const REQUEST_DELAY_MS: Record<string, number> = {
@@ -76,9 +76,10 @@ export function usePrices() {
 
     if (remainingSymbols.length > 0) {
       const provider = getProvider(settings.priceProvider);
+      const apiKey = activeApiKeyFor(settings);
       if (!provider) {
         fetchErrors.push('請先在設定中選擇報價來源，或設定台股報價 Sheet');
-      } else if (!settings.apiKey.trim()) {
+      } else if (!apiKey.trim()) {
         fetchErrors.push('請先在設定中輸入 API key');
       } else {
         const delay = REQUEST_DELAY_MS[provider.id] ?? 1000;
@@ -86,7 +87,7 @@ export function usePrices() {
           const symbol = remainingSymbols[i];
           const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
           try {
-            const { price, changePercent } = await provider.fetchQuote(symbol, settings.apiKey, assetClass);
+            const { price, changePercent } = await provider.fetchQuote(symbol, apiKey, assetClass);
             fetchedEntries.push({ symbol, price, changePercent, updatedAt: new Date().toISOString() });
           } catch (err) {
             fetchErrors.push(err instanceof PriceFetchError ? err.message : `${symbol}：報價失敗`);
@@ -117,14 +118,14 @@ export function usePrices() {
 
   useEffect(() => {
     if (hasAutoFetchedOnMount) return;
-    const hasProvider = settings.priceProvider !== 'none' && settings.apiKey.trim().length > 0;
+    const hasProvider = settings.priceProvider !== 'none' && activeApiKeyFor(settings).trim().length > 0;
     const hasTwSheet = settings.twQuoteSheetUrl.trim().length > 0;
     if (!hasProvider && !hasTwSheet) return;
     if (holdings.length === 0) return;
     hasAutoFetchedOnMount = true;
     refreshPrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.priceProvider, settings.apiKey, settings.twQuoteSheetUrl, holdings.length]);
+  }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.twQuoteSheetUrl, holdings.length]);
 
   return { refreshPrices, isRefreshing, errors };
 }

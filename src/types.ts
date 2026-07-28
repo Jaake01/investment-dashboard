@@ -47,7 +47,10 @@ export type Theme = 'light' | 'dark' | 'system';
 export interface Settings {
   sheetUrl: string;
   priceProvider: PriceProviderId;
-  apiKey: string;
+  // Each provider remembers its own key, so switching priceProvider doesn't
+  // require re-pasting whichever one you used before.
+  finnhubApiKey: string;
+  twelveDataApiKey: string;
   // Optional: CSV published from a Google Sheet tab using GOOGLEFINANCE, for
   // TW stock quotes — Finnhub/Twelve Data's free tiers don't reliably cover
   // TWSE. Takes priority over priceProvider for tw_stock holdings.
@@ -56,6 +59,13 @@ export interface Settings {
   marketauxApiKey: string;
   // 'system' follows the OS/browser prefers-color-scheme; 'light'/'dark' force it.
   theme: Theme;
+}
+
+// The API key for whichever provider is currently selected.
+export function activeApiKeyFor(settings: Settings): string {
+  if (settings.priceProvider === 'finnhub') return settings.finnhubApiKey;
+  if (settings.priceProvider === 'twelvedata') return settings.twelveDataApiKey;
+  return '';
 }
 
 export interface PriceEntry {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { fetchTwelveDataQuote } from '../lib/priceProviders/twelvedata';
 import { PriceFetchError } from '../lib/priceProviders/errors';
+import { activeApiKeyFor } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 5 * 60_000;
 
@@ -14,7 +15,7 @@ export function useFxRate() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const canAutoFetch = settings.priceProvider === 'twelvedata' && settings.apiKey.trim().length > 0;
+  const canAutoFetch = settings.priceProvider === 'twelvedata' && activeApiKeyFor(settings).trim().length > 0;
 
   const refreshFxRate = async () => {
     if (!canAutoFetch) {
@@ -24,7 +25,7 @@ export function useFxRate() {
     setIsRefreshing(true);
     setError('');
     try {
-      const { price: usdToTwd } = await fetchTwelveDataQuote('USD/TWD', settings.apiKey);
+      const { price: usdToTwd } = await fetchTwelveDataQuote('USD/TWD', activeApiKeyFor(settings));
       setFxRate({ usdToTwd, updatedAt: new Date().toISOString(), source: 'auto' });
     } catch (err) {
       setError(err instanceof PriceFetchError ? err.message : '匯率刷新失敗');

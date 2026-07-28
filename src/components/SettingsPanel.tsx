@@ -6,7 +6,7 @@ import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
-import type { ImportedHoldingRow, PriceProviderId, Theme } from '../types';
+import { activeApiKeyFor, type ImportedHoldingRow, type PriceProviderId, type Theme } from '../types';
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'light', label: '淺色' },
@@ -130,15 +130,19 @@ export function SettingsPanel() {
           <input
             type="password"
             placeholder="API key"
-            value={settings.apiKey}
-            onChange={(e) => setSettings({ apiKey: e.target.value })}
+            value={activeApiKeyFor(settings)}
+            disabled={settings.priceProvider === 'none'}
+            onChange={(e) => {
+              if (settings.priceProvider === 'finnhub') setSettings({ finnhubApiKey: e.target.value });
+              else if (settings.priceProvider === 'twelvedata') setSettings({ twelveDataApiKey: e.target.value });
+            }}
           />
           <button className="btn btn-primary" onClick={handleRefreshAll} disabled={isRefreshing || isFxRefreshing}>
             {isRefreshing || isFxRefreshing ? '刷新中…' : '立即刷新報價'}
           </button>
         </div>
         <p className="settings-hint">
-          API key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。選擇 Twelve Data 時，這顆按鈕也會一併刷新美元/台幣匯率。
+          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。選擇 Twelve Data 時，這顆按鈕也會一併刷新美元/台幣匯率。
         </p>
         {priceErrors.length > 0 && (
           <ul className="form-error-list">

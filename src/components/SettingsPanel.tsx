@@ -224,25 +224,6 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
-        <h3>新聞（Marketaux，選填）</h3>
-        <p className="settings-hint">
-          「新聞」分頁的熱門市場新聞與持股相關新聞資料來自 Marketaux。到{' '}
-          <a href="https://www.marketaux.com/" target="_blank" rel="noreferrer">
-            marketaux.com
-          </a>{' '}
-          註冊帳號，在 Dashboard 找到 API Token 貼在下方即可，免費額度約每天 100 次請求。
-        </p>
-        <div className="settings-row">
-          <input
-            type="password"
-            placeholder="Marketaux API token"
-            value={settings.marketauxApiKey}
-            onChange={(e) => setSettings({ marketauxApiKey: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="settings-group">
         <h3>每日自動記錄</h3>
         <p className="settings-hint">
           GitHub Actions 每天會在背景自動記錄一次資產快照，不需要打開網站，讓「較昨日」跟持倉圖的漲跌%

@@ -55,8 +55,6 @@ export interface Settings {
   // TW stock quotes — Finnhub/Twelve Data's free tiers don't reliably cover
   // TWSE. Takes priority over priceProvider for tw_stock holdings.
   twQuoteSheetUrl: string;
-  // Optional: Marketaux API token, used only by the 新聞 tab.
-  marketauxApiKey: string;
   // 'system' follows the OS/browser prefers-color-scheme; 'light'/'dark' force it.
   theme: Theme;
 }
@@ -71,7 +69,7 @@ export function activeApiKeyFor(settings: Settings): string {
 // The API key fields are real secrets — Firestore security rules only gate
 // client access, not the project owner's own Console/admin access, so these
 // three never leave the browser. Everything else in Settings is safe to sync.
-const NON_SYNCABLE_SETTINGS_KEYS = ['finnhubApiKey', 'twelveDataApiKey', 'marketauxApiKey'] as const;
+const NON_SYNCABLE_SETTINGS_KEYS = ['finnhubApiKey', 'twelveDataApiKey'] as const;
 export type SyncableSettings = Omit<Settings, (typeof NON_SYNCABLE_SETTINGS_KEYS)[number]>;
 
 export function toSyncableSettings(settings: Settings): SyncableSettings {
@@ -119,14 +117,4 @@ export interface Transaction {
   action: TransactionAction;
   price: number;
   amount: number;
-}
-
-export interface NewsItem {
-  id: string;
-  title: string;
-  snippet: string;
-  url: string;
-  source: string;
-  publishedAt: string; // ISO
-  relatedSymbols: string[]; // matched holding symbols; empty for general/trending news
 }

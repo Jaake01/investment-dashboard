@@ -54,16 +54,18 @@ export function usePrices() {
     const fetchedEntries: PriceEntry[] = [];
     const fetchErrors: string[] = [];
 
-    // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for
-    // tw_stock holdings — Finnhub/Twelve Data's free tiers don't reliably
-    // cover TWSE. Anything it doesn't cover falls through to the provider.
+    // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for any
+    // symbol it covers — Finnhub/Twelve Data's free tiers don't reliably
+    // cover TWSE. Matched by symbol, not assetClass, since a TW high-dividend
+    // ETF/bond fund someone tracks under 現金 instead of 台股 is still the
+    // same TW-listed symbol the sheet quotes. Anything the sheet doesn't
+    // cover falls through to the provider.
     let remainingSymbols = staleSymbols;
     if (settings.twQuoteSheetUrl.trim()) {
       try {
         const twQuotes = await fetchQuoteSheet(settings.twQuoteSheetUrl);
         remainingSymbols = staleSymbols.filter((symbol) => {
-          const holding = holdings.find((h) => h.symbol.trim() === symbol);
-          if (holding?.assetClass === 'tw_stock' && twQuotes[symbol] !== undefined) {
+          if (twQuotes[symbol] !== undefined) {
             fetchedEntries.push({ symbol, price: twQuotes[symbol], updatedAt: new Date().toISOString() });
             return false;
           }

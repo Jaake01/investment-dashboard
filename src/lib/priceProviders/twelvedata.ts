@@ -1,4 +1,5 @@
 import type { AssetClass } from '../../types';
+import { looksLikeTwSymbol } from '../symbolClass';
 import { PriceFetchError } from './errors';
 import type { QuoteResult } from './index';
 
@@ -8,12 +9,6 @@ interface TwelveDataQuoteResponse {
   code?: number;
   message?: string;
 }
-
-// Plain tickers like "2330" collide across exchanges, so non-US symbols need
-// an explicit exchange hint or Twelve Data can't resolve which listing you mean.
-const EXCHANGE_FOR_ASSET_CLASS: Partial<Record<AssetClass, string>> = {
-  tw_stock: 'TWSE',
-};
 
 // There's no bare "BTC" instrument — crypto has to be queried as a trading
 // pair (same "BASE/QUOTE" convention this app already uses for the USD/TWD
@@ -27,8 +22,10 @@ function symbolForQuery(symbol: string, assetClass?: AssetClass): string {
 }
 
 export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<QuoteResult> {
-  const exchange = assetClass ? EXCHANGE_FOR_ASSET_CLASS[assetClass] : undefined;
-  const exchangeParam = exchange ? `&exchange=${encodeURIComponent(exchange)}` : '';
+  // Based on the symbol's own shape (numeric = TW-listed), not the holding's
+  // assetClass — a TW high-dividend ETF tracked under 現金 instead of 台股
+  // still needs the exchange hint to resolve correctly.
+  const exchangeParam = looksLikeTwSymbol(symbol) ? `&exchange=${encodeURIComponent('TWSE')}` : '';
   const querySymbol = symbolForQuery(symbol, assetClass);
   const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(querySymbol)}${exchangeParam}&apikey=${encodeURIComponent(apiKey)}`;
   let response: Response;

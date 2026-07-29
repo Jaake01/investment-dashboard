@@ -64,11 +64,20 @@ export function formatPercent(value: number): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-// Reverted to news.google.com — the www.google.com/search?tbm=nws switch
-// (combined with AND-ing the symbol and company name together) returned no
-// results for many holdings, so it's back to the simpler, previously-working
-// query. hl/gl/ceid=zh-TW bias Google News toward Chinese-language sources/UI.
+// Uses the classic www.google.com News-tab search (tbm=nws) so tbs=sbd:1 can
+// force a true date sort (news.google.com has no such param). The earlier
+// attempt at this combined tbm=nws with the "when:7d" text operator, which
+// only news.google.com itself recognizes — on the classic search it was
+// parsed as literal search text, which is almost certainly why so many
+// holdings turned up zero results. The date range now comes from tbs=qdr:w
+// (past week) instead, not from query text.
 export function googleNewsUrlFor(symbol: string): string {
-  const query = `${symbol} when:1h`;
-  return `https://news.google.com/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+  const params = new URLSearchParams({
+    q: symbol,
+    tbm: 'nws',
+    tbs: 'qdr:w,sbd:1',
+    hl: 'zh-TW',
+    gl: 'TW',
+  });
+  return `https://www.google.com/search?${params.toString()}`;
 }

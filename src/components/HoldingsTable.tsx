@@ -192,7 +192,7 @@ export function HoldingsTable() {
                           href={googleNewsUrlFor(m.holding.symbol)}
                           target="_blank"
                           rel="noreferrer"
-                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 1 小時）`}
+                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 7 天，依最新排序）`}
                         >
                           📰
                         </a>

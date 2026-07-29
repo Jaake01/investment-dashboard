@@ -64,8 +64,21 @@ export function formatPercent(value: number): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-// hl/gl/ceid=zh-TW bias Google News toward Chinese-language sources/UI.
-export function googleNewsUrlFor(symbol: string): string {
-  const query = `${symbol} when:7d`;
-  return `https://news.google.com/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+// Uses the classic www.google.com News-tab search (tbm=nws) rather than
+// news.google.com — it has a documented URL param for sorting by most recent
+// (tbs=sbd:1), which news.google.com's own search has no equivalent for.
+// Includes both the symbol and company name (when known) in the query since
+// Chinese financial news almost always refers to a TW stock by name (e.g.
+// 台積電), not ticker.
+export function googleNewsUrlFor(symbol: string, name?: string): string {
+  const keyword = name ? `${symbol} ${name}` : symbol;
+  const query = `${keyword} when:7d`;
+  const params = new URLSearchParams({
+    q: query,
+    tbm: 'nws',
+    tbs: 'sbd:1',
+    hl: 'zh-TW',
+    gl: 'TW',
+  });
+  return `https://www.google.com/search?${params.toString()}`;
 }

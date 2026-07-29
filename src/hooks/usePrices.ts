@@ -65,8 +65,9 @@ export function usePrices() {
       try {
         const twQuotes = await fetchQuoteSheet(settings.twQuoteSheetUrl);
         remainingSymbols = staleSymbols.filter((symbol) => {
-          if (twQuotes[symbol] !== undefined) {
-            fetchedEntries.push({ symbol, price: twQuotes[symbol], updatedAt: new Date().toISOString() });
+          const quote = twQuotes[symbol];
+          if (quote !== undefined) {
+            fetchedEntries.push({ symbol, price: quote.price, changePercent: quote.changePercent, updatedAt: new Date().toISOString() });
             return false;
           }
           return true;

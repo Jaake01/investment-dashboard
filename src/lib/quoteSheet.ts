@@ -5,11 +5,19 @@ function normalizeHeader(header: string): string {
   return header.trim().toLowerCase().replace(/[\s_-]+/g, '');
 }
 
-// Reads a small "symbol,price" CSV published from a Google Sheet tab that
-// uses GOOGLEFINANCE (e.g. =GOOGLEFINANCE("TPE:"&A2,"price")). This exists
-// because Finnhub's and Twelve Data's free tiers don't reliably cover TWSE
-// real-time quotes — GOOGLEFINANCE does, and it's already free.
-export async function fetchQuoteSheet(url: string): Promise<Record<string, number>> {
+export interface TwQuote {
+  price: number;
+  // Only present if the sheet also has a change% column (e.g.
+  // =GOOGLEFINANCE("TPE:"&A2,"changepct")) — optional, since the day-change
+  // isn't needed for the quote itself to work.
+  changePercent?: number;
+}
+
+// Reads a small "symbol,price[,change]" CSV published from a Google Sheet tab
+// that uses GOOGLEFINANCE (e.g. =GOOGLEFINANCE("TPE:"&A2,"price")). This
+// exists because Finnhub's and Twelve Data's free tiers don't reliably cover
+// TWSE real-time quotes — GOOGLEFINANCE does, and it's already free.
+export async function fetchQuoteSheet(url: string): Promise<Record<string, TwQuote>> {
   if (!url.trim()) return {};
 
   let response: Response;
@@ -40,14 +48,19 @@ export async function fetchQuoteSheet(url: string): Promise<Record<string, numbe
   if (!symbolKey || !priceKey) {
     throw new CsvImportError('台股報價 Sheet 需要有 symbol 和 price 兩個欄位（標題列）');
   }
+  const changeKey = ['change', 'changepercent', 'changepct', '漲跌', '漲跌幅'].find((k) => k in rows[0]);
 
-  const map: Record<string, number> = {};
+  const map: Record<string, TwQuote> = {};
   for (const row of rows) {
     const symbol = (row[symbolKey] ?? '').trim().toUpperCase();
     const price = Number((row[priceKey] ?? '').replace(/[,$\s]/g, ''));
-    if (symbol && Number.isFinite(price) && price > 0) {
-      map[symbol] = price;
+    if (!symbol || !Number.isFinite(price) || price <= 0) continue;
+    let changePercent: number | undefined;
+    if (changeKey) {
+      const raw = Number((row[changeKey] ?? '').replace(/[%,\s]/g, ''));
+      if (Number.isFinite(raw)) changePercent = raw;
     }
+    map[symbol] = { price, changePercent };
   }
   return map;
 }

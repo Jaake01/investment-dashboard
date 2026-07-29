@@ -330,6 +330,11 @@ th {
   font-size: 13px;
 }
 
+.holdings-total-row td {
+  font-weight: 600;
+  border-top: 2px solid var(--border);
+}
+
 .row-actions {
   display: flex;
   gap: 6px;

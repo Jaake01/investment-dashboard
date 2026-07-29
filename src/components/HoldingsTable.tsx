@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
-import { computeHoldingMetrics, type HoldingMetrics } from '../lib/calculations';
+import { computeClassTotals, computeHoldingMetrics, type HoldingMetrics } from '../lib/calculations';
 import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
 import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
-type SortKey = 'symbol' | 'price' | 'change' | 'shares' | 'avgCost' | 'marketValue' | 'gainLoss' | 'gainLossPct';
+type SortKey = 'symbol' | 'price' | 'change' | 'shares' | 'avgCost' | 'costValue' | 'marketValue' | 'gainLoss' | 'gainLossPct';
 
 interface Row {
   m: HoldingMetrics;
@@ -25,6 +25,8 @@ function sortValue(row: Row, key: SortKey): number | string | undefined {
       return row.m.holding.shares;
     case 'avgCost':
       return row.m.holding.avgCost;
+    case 'costValue':
+      return row.m.costValue;
     case 'marketValue':
       return row.m.marketValue;
     case 'gainLoss':
@@ -54,7 +56,7 @@ const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 // Fixed pixel widths (used with table-layout: fixed) so columns don't
 // reshuffle as values change length — e.g. switching tabs between
 // currencies, or a price refresh changing digit count.
-const COLUMN_WIDTHS = ['70px', '110px', '80px', '90px', '100px', '110px', '100px', '80px', '50px'];
+const COLUMN_WIDTHS = ['70px', '110px', '80px', '90px', '100px', '100px', '110px', '100px', '80px', '50px'];
 
 interface OpenMenu {
   id: string;
@@ -104,6 +106,7 @@ export function HoldingsTable() {
     changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
   }));
   const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
+  const totals = computeClassTotals(metrics);
 
   return (
     <section className="card">
@@ -147,6 +150,7 @@ export function HoldingsTable() {
                     ['change', '漲跌'],
                     ['shares', '數量'],
                     ['avgCost', '平均成本'],
+                    ['costValue', '總成本'],
                     ['marketValue', '市值'],
                     ['gainLoss', '損益'],
                     ['gainLossPct', '損益率'],
@@ -177,6 +181,7 @@ export function HoldingsTable() {
                     </td>
                     <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
                     <td>{formatDollar(m.holding.avgCost)}</td>
+                    <td>{formatDollar(m.costValue)}</td>
                     <td>{formatDollar(m.marketValue)}</td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatSignedNumber(m.gainLoss)}</td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
@@ -244,6 +249,24 @@ export function HoldingsTable() {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="holdings-total-row">
+                <td>總計</td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+                <td>{formatDollar(totals.totalCostValue)}</td>
+                <td>{formatDollar(totals.totalMarketValue)}</td>
+                <td className={totals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                  {formatSignedNumber(totals.totalGainLoss)}
+                </td>
+                <td className={totals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                  {formatPercent(totals.totalGainLossPct)}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

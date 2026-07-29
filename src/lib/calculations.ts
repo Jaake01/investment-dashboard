@@ -205,6 +205,24 @@ export function computeTotalInTwd(metrics: HoldingMetrics[], usdToTwd: number | 
   return total;
 }
 
+export interface ClassTotals {
+  totalCostValue: number;
+  totalMarketValue: number;
+  totalGainLoss: number;
+  totalGainLossPct: number;
+}
+
+// Native-currency totals across metrics sharing the same asset class (unlike
+// the portfolio-wide TWD totals below, no FX conversion is needed here since
+// callers only ever pass metrics already filtered to one class/currency).
+export function computeClassTotals(metrics: HoldingMetrics[]): ClassTotals {
+  const totalCostValue = metrics.reduce((sum, m) => sum + m.costValue, 0);
+  const totalMarketValue = metrics.reduce((sum, m) => sum + m.marketValue, 0);
+  const totalGainLoss = totalMarketValue - totalCostValue;
+  const totalGainLossPct = totalCostValue !== 0 ? (totalGainLoss / totalCostValue) * 100 : 0;
+  return { totalCostValue, totalMarketValue, totalGainLoss, totalGainLossPct };
+}
+
 export function computeTotalCostInTwd(metrics: HoldingMetrics[], usdToTwd: number | null): number | null {
   let total = 0;
   for (const m of metrics) {

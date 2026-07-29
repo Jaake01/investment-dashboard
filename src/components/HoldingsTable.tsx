@@ -189,10 +189,10 @@ export function HoldingsTable() {
                       {m.holding.symbol && (
                         <a
                           className="news-link-icon"
-                          href={googleNewsUrlFor(m.holding.symbol, m.holding.name)}
+                          href={googleNewsUrlFor(m.holding.symbol)}
                           target="_blank"
                           rel="noreferrer"
-                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 7 天）`}
+                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 1 小時）`}
                         >
                           📰
                         </a>

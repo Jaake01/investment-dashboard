@@ -4,14 +4,13 @@ import { CurrencyBreakdown } from './CurrencyBreakdown';
 import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
-import { NewsPanel } from './NewsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { usePortfolio } from '../context/PortfolioContext';
 
-type Page = 'overview' | 'news' | 'settings';
+type Page = 'overview' | 'settings';
 
 export function Layout() {
   const [page, setPage] = useState<Page>('overview');
@@ -51,12 +50,6 @@ export function Layout() {
             總覽
           </button>
           <button
-            className={`tab-button ${page === 'news' ? 'active' : ''}`}
-            onClick={() => setPage('news')}
-          >
-            新聞
-          </button>
-          <button
             className={`tab-button ${page === 'settings' ? 'active' : ''}`}
             onClick={() => setPage('settings')}
           >
@@ -73,8 +66,6 @@ export function Layout() {
             <TrendChart />
             <HoldingsTable />
           </>
-        ) : page === 'news' ? (
-          <NewsPanel />
         ) : (
           <SettingsPanel />
         )}

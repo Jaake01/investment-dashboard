@@ -20,7 +20,6 @@ const DEFAULT_SETTINGS: Settings = {
   finnhubApiKey: '',
   twelveDataApiKey: '',
   twQuoteSheetUrl: '',
-  marketauxApiKey: '',
   theme: 'system',
 };
 

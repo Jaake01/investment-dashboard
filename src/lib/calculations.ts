@@ -1,5 +1,18 @@
 import type { AssetClass, Currency, Holding, PriceEntry, Snapshot } from '../types';
 import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS } from '../types';
+import { looksLikeTwSymbol } from './symbolClass';
+
+// 現金 defaults to TWD, but if the symbol doesn't look like a TW ticker
+// (purely numeric), it's almost certainly a USD-denominated holding someone
+// tracks under 現金 for grouping purposes rather than a TWD cash balance —
+// auto-detected so no manual currency setting is needed. Other classes keep
+// their fixed CURRENCY_FOR_ASSET_CLASS mapping unchanged.
+export function currencyFor(holding: Holding): Currency {
+  if (holding.assetClass === 'cash' && holding.symbol && !looksLikeTwSymbol(holding.symbol)) {
+    return 'USD';
+  }
+  return CURRENCY_FOR_ASSET_CLASS[holding.assetClass];
+}
 
 export interface HoldingMetrics {
   holding: Holding;
@@ -52,7 +65,7 @@ export function computeAllocation(
   const map = new Map<string, AllocationSlice>();
   for (const m of metrics) {
     if (m.marketValue <= 0) continue;
-    const value = convertToTwd(m.marketValue, m.holding.assetClass, usdToTwd) ?? m.marketValue;
+    const value = convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue;
     const key = groupBy === 'assetClass' ? m.holding.assetClass : m.holding.id;
     const label = groupBy === 'assetClass'
       ? ASSET_CLASS_LABELS[m.holding.assetClass as AssetClass]
@@ -165,8 +178,7 @@ export function mergeSnapshots(local: Snapshot[], remote: Snapshot[]): Snapshot[
 }
 
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.
-export function convertToTwd(nativeValue: number, assetClass: AssetClass, usdToTwd: number | null): number | null {
-  const currency = CURRENCY_FOR_ASSET_CLASS[assetClass];
+export function convertToTwd(nativeValue: number, currency: Currency, usdToTwd: number | null): number | null {
   if (currency === 'TWD') return nativeValue;
   if (usdToTwd === null) return null;
   return nativeValue * usdToTwd;
@@ -198,7 +210,7 @@ export function computeCurrencyBuckets(metrics: HoldingMetrics[]): CurrencyBucke
 export function computeTotalInTwd(metrics: HoldingMetrics[], usdToTwd: number | null): number | null {
   let total = 0;
   for (const m of metrics) {
-    const twdValue = convertToTwd(m.marketValue, m.holding.assetClass, usdToTwd);
+    const twdValue = convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd);
     if (twdValue === null) return null;
     total += twdValue;
   }
@@ -226,7 +238,7 @@ export function computeClassTotals(metrics: HoldingMetrics[]): ClassTotals {
 export function computeTotalCostInTwd(metrics: HoldingMetrics[], usdToTwd: number | null): number | null {
   let total = 0;
   for (const m of metrics) {
-    const twdValue = convertToTwd(m.costValue, m.holding.assetClass, usdToTwd);
+    const twdValue = convertToTwd(m.costValue, currencyFor(m.holding), usdToTwd);
     if (twdValue === null) return null;
     total += twdValue;
   }

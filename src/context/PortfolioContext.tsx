@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: Settings = {
   finnhubApiKey: '',
   twelveDataApiKey: '',
   twQuoteSheetUrl: '',
+  cashLedgerSheetUrl: '',
   theme: 'system',
 };
 
@@ -33,6 +34,7 @@ interface PortfolioContextValue {
   fxRate: FxRate | null;
   syncStatus: SyncStatus;
   syncError: string | null;
+  cashBalances: Record<string, number>;
   addHolding: (input: NewHoldingInput) => void;
   updateHolding: (id: string, patch: Partial<NewHoldingInput>) => void;
   deleteHolding: (id: string) => void;
@@ -40,6 +42,7 @@ interface PortfolioContextValue {
   mergeHoldingsFromImport: (rows: ImportedHoldingRow[]) => void;
   setSettings: (patch: Partial<Settings>) => void;
   applyPriceUpdates: (entries: PriceEntry[]) => void;
+  setCashBalances: (balances: Record<string, number>) => void;
   recordCurrentSnapshot: (
     totalValue: number,
     classValues: Partial<Record<AssetClass, number>>,
@@ -82,6 +85,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [prices, setPrices] = useLocalStorage<Record<string, PriceEntry>>(storageKey('prices'), {});
   const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>(storageKey('snapshots'), []);
   const [fxRate, setFxRateState] = useLocalStorage<FxRate | null>(storageKey('fxRate'), null);
+  // Local-only, like fxRate/prices — re-fetched from the cash ledger sheet on
+  // load rather than synced to the cloud, since it's a cheap derived value.
+  const [cashBalances, setCashBalancesState] = useLocalStorage<Record<string, number>>(storageKey('cashBalances'), {});
 
   const cloudSync = useCloudSync({ holdings, setHoldings, settings, setSettingsState, snapshots, setSnapshots });
 
@@ -91,6 +97,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     prices,
     snapshots,
     fxRate,
+    cashBalances,
     syncStatus: cloudSync.syncStatus,
     syncError: cloudSync.syncError,
 
@@ -186,7 +193,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     setFxRate: (rate) => {
       setFxRateState(rate);
     },
-  }), [holdings, settings, prices, snapshots, fxRate, cloudSync, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState]);
+
+    setCashBalances: (balances) => {
+      setCashBalancesState(balances);
+    },
+  }), [holdings, settings, prices, snapshots, fxRate, cashBalances, cloudSync, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState, setCashBalancesState]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
 }

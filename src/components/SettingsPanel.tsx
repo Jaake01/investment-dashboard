@@ -7,6 +7,7 @@ import { PRICE_PROVIDERS } from '../lib/priceProviders';
 import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useCashLedger } from '../hooks/useCashLedger';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { activeApiKeyFor, type ImportedHoldingRow, type PriceProviderId, type Theme } from '../types';
 
@@ -25,12 +26,25 @@ export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, syncStatus, syncError } = usePortfolio();
   const { user, loading: authLoading, signInError, signInWithGoogle, signOutUser } = useAuth();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
-  const { refreshFxRate, isRefreshing: isFxRefreshing, error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, updatedAt: fxUpdatedAt } = useFxRate();
+  const {
+    refreshFxRate,
+    isRefreshing: isFxRefreshing,
+    error: fxError,
+    canAutoFetch: canAutoFetchFx,
+    effectiveUsdToTwd,
+    effectiveJpyToTwd,
+    updatedAt: fxUpdatedAt,
+  } = useFxRate();
   const { error: autoSyncError } = useAutoSync();
+  const { refreshCashLedger, isRefreshing: isCashLedgerRefreshing, error: cashLedgerError } = useCashLedger();
   const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
 
   const handleRefreshAll = async () => {
-    await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve()]);
+    await Promise.all([
+      refreshPrices(),
+      canAutoFetchFx ? refreshFxRate() : Promise.resolve(),
+      refreshCashLedger(),
+    ]);
   };
 
   const [importError, setImportError] = useState('');
@@ -178,12 +192,16 @@ export function SettingsPanel() {
               else if (settings.priceProvider === 'twelvedata') setSettings({ twelveDataApiKey: e.target.value });
             }}
           />
-          <button className="btn btn-primary" onClick={handleRefreshAll} disabled={isRefreshing || isFxRefreshing}>
-            {isRefreshing || isFxRefreshing ? '刷新中…' : '立即刷新報價'}
+          <button
+            className="btn btn-primary"
+            onClick={handleRefreshAll}
+            disabled={isRefreshing || isFxRefreshing || isCashLedgerRefreshing}
+          >
+            {isRefreshing || isFxRefreshing || isCashLedgerRefreshing ? '刷新中…' : '立即刷新報價'}
           </button>
         </div>
         <p className="settings-hint">
-          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。選擇 Twelve Data 時，這顆按鈕也會一併刷新美元/台幣匯率。
+          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。選擇 Twelve Data 時，這顆按鈕也會一併刷新美元/台幣、日圓/台幣匯率；有設定現金帳戶 Sheet 網址時也會一併重新讀取現金餘額。
         </p>
         {priceErrors.length > 0 && (
           <ul className="form-error-list">
@@ -192,6 +210,7 @@ export function SettingsPanel() {
             ))}
           </ul>
         )}
+        {cashLedgerError && <p className="form-error">現金帳戶讀取失敗：{cashLedgerError}</p>}
       </div>
 
       <div className="settings-group">
@@ -214,11 +233,34 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
-        <h3>匯率（美元/台幣）</h3>
+        <h3>現金帳戶 Sheet（選填）</h3>
+        <p className="settings-hint">
+          在 Google Sheet 新增一個「現金帳戶」分頁，記錄現金的每一筆異動：A 欄日期、B 欄幣別（TWD/USD/USDT/JPY）、
+          C 欄異動類型（初始餘額／買入扣款／賣出入帳）、D 欄金額（正數=入帳，負數=扣款）、E 欄說明（選填）。
+          「檔案 → 共用 → 發布到網路」，只選這個分頁、格式選 CSV，把產生的網址貼在下方。設定後，儀表板會依幣別加總
+          D 欄金額，換算成目前各幣別的現金餘額。
+        </p>
+        <div className="settings-row">
+          <input
+            type="text"
+            placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+            value={settings.cashLedgerSheetUrl}
+            onChange={(e) => setSettings({ cashLedgerSheetUrl: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="settings-group">
+        <h3>匯率</h3>
         <p className="settings-hint">
           {effectiveUsdToTwd === null
-            ? '尚未取得匯率。'
+            ? '尚未取得美元/台幣匯率。'
             : `目前：1 USD = ${effectiveUsdToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
+        </p>
+        <p className="settings-hint">
+          {effectiveJpyToTwd === null
+            ? '尚未取得日圓/台幣匯率。'
+            : `目前：1 JPY = ${effectiveJpyToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
           {!canAutoFetchFx && '　需選擇 Twelve Data 並填入 API key 才能取得匯率。'}
         </p>
         {fxError && <p className="form-error">{fxError}</p>}

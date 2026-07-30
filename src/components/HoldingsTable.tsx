@@ -3,10 +3,31 @@ import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeClassTotals, computeHoldingMetrics, convertToTwd, currencyFor, type HoldingMetrics } from '../lib/calculations';
-import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
-import { CASH_CURRENCY_ORDER, formatCashAmount, twdRateForCashCurrency } from '../lib/cashLedger';
-import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
+import { formatAmount, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
+import { CASH_CURRENCY_ORDER, twdRateForCashCurrency } from '../lib/cashLedger';
+import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
+
+// Currency label shown as its own left-aligned column next to a value (see
+// .money-cell in index.css), rather than baked into the formatted string —
+// so both the label and the digits line up down the column regardless of
+// label width ("$" vs "US$") or digit count.
+const MONEY_UNIT: Record<Currency, string> = { TWD: '$', USD: 'US$', USDC: 'U' };
+
+// Cash-ledger balances use plain currency codes rather than the app's
+// Currency type. USDT is pegged 1:1 to USD (see twdRateForCashCurrency) and
+// gets the same "US$" label for that reason.
+const CASH_UNIT: Record<string, string> = { TWD: '$', USD: 'US$', USDT: 'US$', JPY: '¥' };
+
+function Money({ unit, value, signed }: { unit: string; value: number | null; signed?: boolean }) {
+  if (value === null) return <span className="money-cell"><span className="money-num">—</span></span>;
+  return (
+    <span className="money-cell">
+      <span className="money-unit">{unit}</span>
+      <span className="money-num">{signed ? formatSignedNumber(value) : formatAmount(value)}</span>
+    </span>
+  );
+}
 
 type SortKey = 'symbol' | 'price' | 'change' | 'shares' | 'avgCost' | 'costValue' | 'marketValue' | 'gainLoss' | 'gainLossPct';
 
@@ -165,6 +186,10 @@ export function HoldingsTable() {
         ? (totals.totalGainLoss / (totals.totalCostValue + cashBalanceTwdTotal)) * 100
         : 0,
   };
+  // 現金 tab totals are normalized to TWD (see computeClassTotals); every
+  // other tab holds one native currency throughout, so the footer keeps
+  // that tab's own label instead of assuming TWD.
+  const footerUnit = MONEY_UNIT[selectedClass === 'cash' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[selectedClass]];
 
   return (
     <section className="card">
@@ -232,11 +257,11 @@ export function HoldingsTable() {
                   <td>{currency}</td>
                   <td>—</td>
                   <td>—</td>
-                  <td>{formatCashAmount(amount, currency)}</td>
+                  <td><Money unit={CASH_UNIT[currency] ?? currency} value={amount} /></td>
                   <td>—</td>
-                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
-                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
-                  <td className="change-up">{twdValue === null ? '—' : '0'}</td>
+                  <td><Money unit="$" value={twdValue} /></td>
+                  <td><Money unit="$" value={twdValue} /></td>
+                  <td className="change-up"><Money unit="$" value={twdValue === null ? null : 0} signed /></td>
                   <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
                   <td></td>
                 </tr>
@@ -244,19 +269,23 @@ export function HoldingsTable() {
               {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
                 const isGain = m.gainLoss >= 0;
                 const isMenuOpen = openMenu?.id === m.holding.id;
-                const unitSuffix = isForeignCash ? ' U' : '';
+                const nativeUnit = MONEY_UNIT[currencyFor(m.holding)];
+                // isForeignCash rows have already been converted to their TWD
+                // equivalent above (see the Row interface), so their 總成本/
+                // 市值/損益 columns get the TWD label instead of the native one.
+                const displayUnit = isForeignCash ? MONEY_UNIT.TWD : nativeUnit;
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
-                    <td>{formatDollar(m.currentPrice)}{unitSuffix}</td>
+                    <td><Money unit={nativeUnit} value={m.currentPrice} /></td>
                     <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
                       {changePercent === undefined ? '—' : formatPercent(changePercent)}
                     </td>
                     <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
-                    <td>{formatDollar(m.holding.avgCost)}{unitSuffix}</td>
-                    <td>{displayCostValue === null ? '—' : formatDollar(displayCostValue)}</td>
-                    <td>{displayMarketValue === null ? '—' : formatDollar(displayMarketValue)}</td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{displayGainLoss === null ? '—' : formatSignedNumber(displayGainLoss)}</td>
+                    <td><Money unit={nativeUnit} value={m.holding.avgCost} /></td>
+                    <td><Money unit={displayUnit} value={displayCostValue} /></td>
+                    <td><Money unit={displayUnit} value={displayMarketValue} /></td>
+                    <td className={isGain ? 'change-up' : 'change-down'}><Money unit={displayUnit} value={displayGainLoss} signed /></td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
                       {m.holding.symbol && (
@@ -329,10 +358,10 @@ export function HoldingsTable() {
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>
-                <td>{formatDollar(combinedTotals.totalCostValue)}</td>
-                <td>{formatDollar(combinedTotals.totalMarketValue)}</td>
+                <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} /></td>
+                <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} /></td>
                 <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                  {formatSignedNumber(combinedTotals.totalGainLoss)}
+                  <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed />
                 </td>
                 <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
                   {formatPercent(combinedTotals.totalGainLossPct)}

@@ -339,6 +339,27 @@ th {
   background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
 }
 
+/* Currency label and value as two ends of a flex row, so the label lines up
+   down the column regardless of its width ("$" vs "US$") and the digits
+   line up regardless of their count. */
+.money-cell {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.money-unit {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.money-num {
+  font-variant-numeric: tabular-nums;
+}
+
 .row-actions {
   display: flex;
   gap: 6px;

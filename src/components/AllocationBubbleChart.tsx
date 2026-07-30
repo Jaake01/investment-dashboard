@@ -12,6 +12,7 @@ import {
   currencyFor,
   type HoldingMetrics,
 } from '../lib/calculations';
+import { CASH_CURRENCY_ORDER, twdRateForCashCurrency } from '../lib/cashLedger';
 import { formatCurrencyIn, formatPercent } from '../lib/format';
 import { monogramColorFor, monogramFor, realIconUrlFor } from '../lib/icons';
 import { ASSET_CLASS_LABELS, ASSET_CLASSES, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency, type Snapshot } from '../types';
@@ -69,11 +70,51 @@ interface BubbleDatum {
   assetClass: AssetClass;
 }
 
+// Cash-ledger balances (see CashLedgerCard) aren't Holdings, so they can't
+// flow through computeHoldingMetrics/currencyFor — each currency becomes its
+// own bubble in the 現金 cluster instead, alongside any 現金-classified
+// Holdings like STRC/0056. Only relevant to the "全部" and "現金" views;
+// other single-class views wouldn't include any cash currencies anyway. No
+// changePct (no per-currency day-change history is tracked, same treatment
+// a symbol-less cash Holding already gets) and no icon (no real ticker).
+function buildCashBalanceEntries(
+  selectedClass: AssetClass | null,
+  cashBalances: Record<string, number>,
+  usdToTwd: number | null,
+  jpyToTwd: number | null,
+): { key: string; name: string; value: number }[] {
+  if (selectedClass !== null && selectedClass !== 'cash') return [];
+  const currencies = Object.keys(cashBalances)
+    .filter((c) => cashBalances[c] !== 0)
+    .sort((a, b) => {
+      const ai = CASH_CURRENCY_ORDER.indexOf(a);
+      const bi = CASH_CURRENCY_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  const entries: { key: string; name: string; value: number }[] = [];
+  for (const currency of currencies) {
+    const amount = cashBalances[currency];
+    // Single-class (現金) drill-down shows native amounts, matching how
+    // STRC/0056 already render unconverted in that view; the combined "全部"
+    // view converts to TWD like every other class does there.
+    const rate = selectedClass ? 1 : twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    const value = rate === null ? null : amount * rate;
+    if (value === null || value <= 0) continue;
+    entries.push({ key: `cash-balance-${currency}`, name: `${currency} 現金`, value });
+  }
+  return entries;
+}
+
 function buildBubbleData(
   metrics: HoldingMetrics[],
   selectedClass: AssetClass | null,
   usdToTwd: number | null,
+  jpyToTwd: number | null,
   snapshots: Snapshot[],
+  cashBalances: Record<string, number>,
 ): BubbleDatum[] {
   const scoped = selectedClass ? metrics.filter((m) => m.holding.assetClass === selectedClass) : metrics;
   const entries = scoped
@@ -85,27 +126,43 @@ function buildBubbleData(
       // computeAllocation). A single-class view is already one currency.
       value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
     }));
-  const total = entries.reduce((sum, e) => sum + e.value, 0);
-  return entries
-    .map(({ m, value }) => {
-      const symbol = m.holding.symbol;
-      const percent = total > 0 ? (value / total) * 100 : 0;
-      const changePct = symbol ? computeDayChangePct(m.marketValue, computePreviousSymbolValue(snapshots, symbol)) : null;
-      return {
-        key: m.holding.id,
-        name: symbol || m.holding.name || '未命名',
-        value,
-        percent,
-        percentLabel: `${percent.toFixed(1)}%`,
-        fill: bubbleColorFor(m.holding.assetClass, symbol || m.holding.id),
-        changePct,
-        icon: symbol
-          ? { iconUrl: realIconUrlFor(symbol, m.holding.assetClass), monogram: monogramFor(symbol), monogramColor: monogramColorFor(symbol) }
-          : null,
-        assetClass: m.holding.assetClass,
-      };
-    })
-    .sort((a, b) => b.value - a.value);
+  const cashEntries = buildCashBalanceEntries(selectedClass, cashBalances, usdToTwd, jpyToTwd);
+  const total = entries.reduce((sum, e) => sum + e.value, 0) + cashEntries.reduce((sum, e) => sum + e.value, 0);
+
+  const fromHoldings = entries.map(({ m, value }) => {
+    const symbol = m.holding.symbol;
+    const percent = total > 0 ? (value / total) * 100 : 0;
+    const changePct = symbol ? computeDayChangePct(m.marketValue, computePreviousSymbolValue(snapshots, symbol)) : null;
+    return {
+      key: m.holding.id,
+      name: symbol || m.holding.name || '未命名',
+      value,
+      percent,
+      percentLabel: `${percent.toFixed(1)}%`,
+      fill: bubbleColorFor(m.holding.assetClass, symbol || m.holding.id),
+      changePct,
+      icon: symbol
+        ? { iconUrl: realIconUrlFor(symbol, m.holding.assetClass), monogram: monogramFor(symbol), monogramColor: monogramColorFor(symbol) }
+        : null,
+      assetClass: m.holding.assetClass,
+    };
+  });
+  const fromCash = cashEntries.map(({ key, name, value }) => {
+    const percent = total > 0 ? (value / total) * 100 : 0;
+    return {
+      key,
+      name,
+      value,
+      percent,
+      percentLabel: `${percent.toFixed(1)}%`,
+      fill: bubbleColorFor('cash', key),
+      changePct: null,
+      icon: null,
+      assetClass: 'cash' as AssetClass,
+    };
+  });
+
+  return [...fromHoldings, ...fromCash].sort((a, b) => b.value - a.value);
 }
 
 interface BubbleNode extends BubbleDatum {
@@ -443,14 +500,41 @@ interface PieDatum {
 
 // Class-level breakdown (one slice per asset class) for the overview's pie
 // chart — a coarser view than the bubble chart's per-holding breakdown.
-function buildPieData(metrics: HoldingMetrics[], usdToTwd: number | null, snapshots: Snapshot[]): PieDatum[] {
+// Cash-ledger balances (not Holdings) are folded into the 現金 slice's value
+// — adding a 現金 slice from scratch if there are no 現金-classified Holdings
+// at all yet — and into its today/previous classValue comparison so the
+// slice's day-change % stays consistent with what it now includes.
+function buildPieData(
+  metrics: HoldingMetrics[],
+  usdToTwd: number | null,
+  jpyToTwd: number | null,
+  snapshots: Snapshot[],
+  cashBalances: Record<string, number>,
+): PieDatum[] {
   const slices = computeAllocation(metrics, 'assetClass', usdToTwd);
   const classValuesToday = computeClassValues(metrics);
-  const total = slices.reduce((sum, s) => sum + s.value, 0);
-  return slices.map((s) => {
+  const cashLedgerTwd = Object.entries(cashBalances).reduce((sum, [currency, amount]) => {
+    const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    return rate === null ? sum : sum + amount * rate;
+  }, 0);
+
+  let mergedSlices = slices;
+  if (cashLedgerTwd > 0) {
+    const idx = mergedSlices.findIndex((s) => s.key === 'cash');
+    if (idx >= 0) {
+      mergedSlices = mergedSlices.map((s, i) => (i === idx ? { ...s, value: s.value + cashLedgerTwd } : s));
+    } else {
+      mergedSlices = [...mergedSlices, { key: 'cash', label: ASSET_CLASS_LABELS.cash, value: cashLedgerTwd }].sort(
+        (a, b) => ASSET_CLASSES.indexOf(a.key as AssetClass) - ASSET_CLASSES.indexOf(b.key as AssetClass),
+      );
+    }
+  }
+
+  const total = mergedSlices.reduce((sum, s) => sum + s.value, 0);
+  return mergedSlices.map((s) => {
     const assetClass = s.key as AssetClass;
     const percent = total > 0 ? (s.value / total) * 100 : 0;
-    const todayValue = classValuesToday[assetClass] ?? 0;
+    const todayValue = (classValuesToday[assetClass] ?? 0) + (assetClass === 'cash' ? cashLedgerTwd : 0);
     return {
       key: assetClass,
       label: s.label,
@@ -581,8 +665,8 @@ function PieChartSvg({ data }: { data: PieDatum[] }) {
 const BASE_CLASS_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 
 export function AllocationBubbleChart() {
-  const { holdings, prices, snapshots } = usePortfolio();
-  const { effectiveUsdToTwd } = useFxRate();
+  const { holdings, prices, snapshots, cashBalances } = usePortfolio();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
   const [selectedClass, setSelectedClass] = useState<AssetClass | null>(null);
   // The pie view only makes sense at the class-level overview — drilling
   // into a single class still always shows its individual holdings as
@@ -595,11 +679,11 @@ export function AllocationBubbleChart() {
   const hasOther = holdings.some((h) => h.assetClass === 'other');
   const classTabs = hasOther ? [...BASE_CLASS_TABS, 'other' as AssetClass] : BASE_CLASS_TABS;
 
-  const data = buildBubbleData(metrics, selectedClass, effectiveUsdToTwd, snapshots);
+  const data = buildBubbleData(metrics, selectedClass, effectiveUsdToTwd, effectiveJpyToTwd, snapshots, cashBalances);
   const isEmpty = data.length === 0;
   const currency = selectedClass ? CURRENCY_FOR_ASSET_CLASS[selectedClass] : 'TWD';
   const showPie = selectedClass === null && viewMode === 'pie';
-  const pieData = showPie ? buildPieData(metrics, effectiveUsdToTwd, snapshots) : [];
+  const pieData = showPie ? buildPieData(metrics, effectiveUsdToTwd, effectiveJpyToTwd, snapshots, cashBalances) : [];
 
   return (
     <section className="card">

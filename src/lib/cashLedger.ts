@@ -38,6 +38,25 @@ export function twdRateForCashCurrency(currency: string, usdToTwd: number | null
   return null;
 }
 
+// Best-effort TWD total across all cash-ledger balances — currencies whose
+// rate isn't available yet just contribute 0 rather than making the whole
+// total unavailable, unlike computeTotalInTwd's all-or-nothing behavior for
+// Holdings (CashLedgerCard/HoldingsTable separately surface which specific
+// currency is missing a rate; call sites that just want one number, like
+// PortfolioSummary's overall total, use this instead).
+export function computeCashLedgerTwdTotal(
+  balances: Record<string, number>,
+  usdToTwd: number | null,
+  jpyToTwd: number | null,
+): number {
+  let total = 0;
+  for (const [currency, amount] of Object.entries(balances)) {
+    const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    if (rate !== null) total += amount * rate;
+  }
+  return total;
+}
+
 export interface CashLedgerEntry {
   date: string;
   currency: string;

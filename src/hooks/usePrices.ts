@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
 import { computeClassValues, computeHoldingMetrics, computeSymbolValues, computeTotalInTwd } from '../lib/calculations';
+import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { CsvImportError } from '../lib/csv';
 import { fetchQuoteSheet } from '../lib/quoteSheet';
 import { useFxRate } from './useFxRate';
@@ -24,8 +25,8 @@ function sleep(ms: number) {
 let hasAutoFetchedOnMount = false;
 
 export function usePrices() {
-  const { holdings, settings, prices, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
-  const { effectiveUsdToTwd } = useFxRate();
+  const { holdings, settings, prices, cashBalances, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -111,7 +112,17 @@ export function usePrices() {
       const metrics = holdings.map((h) => computeHoldingMetrics(h, mergedPrices));
       const totalTwd = computeTotalInTwd(metrics, effectiveUsdToTwd);
       if (totalTwd !== null) {
-        recordCurrentSnapshot(totalTwd, computeClassValues(metrics), computeSymbolValues(metrics));
+        // Cash-ledger balances aren't Holdings, so they're folded into the
+        // snapshot total (and the 現金 classValues bucket, for the pie
+        // chart's day-change tracking) here rather than inside
+        // computeTotalInTwd/computeClassValues — keeps 較昨日/趨勢圖
+        // consistent with PortfolioSummary's "total including cash ledger".
+        const cashLedgerTwd = computeCashLedgerTwdTotal(cashBalances, effectiveUsdToTwd, effectiveJpyToTwd);
+        const classValues = computeClassValues(metrics);
+        if (cashLedgerTwd !== 0) {
+          classValues.cash = (classValues.cash ?? 0) + cashLedgerTwd;
+        }
+        recordCurrentSnapshot(totalTwd + cashLedgerTwd, classValues, computeSymbolValues(metrics));
       }
     }
 

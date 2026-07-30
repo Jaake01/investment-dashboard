@@ -324,7 +324,7 @@ export function HoldingsTable() {
             </tbody>
             <tfoot>
               <tr className="holdings-total-row">
-                <td>{selectedClass === 'cash' ? '總計（台幣 NTD）' : '總計'}</td>
+                <td>{selectedClass === 'cash' ? '總計（台幣 TWD）' : '總計'}</td>
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>

@@ -17,21 +17,36 @@ export function useFxRate() {
 
   const canAutoFetch = settings.priceProvider === 'twelvedata' && activeApiKeyFor(settings).trim().length > 0;
 
+  // USD/TWD and JPY/TWD are fetched independently — one failing (e.g. Twelve
+  // Data doesn't have a quote for it) shouldn't block the other. A rate that
+  // fails to fetch keeps its last known value rather than being cleared.
   const refreshFxRate = async () => {
     if (!canAutoFetch) {
       setError('自動抓匯率需要選擇 Twelve Data 並填入 API key');
       return;
     }
     setIsRefreshing(true);
-    setError('');
+    const apiKey = activeApiKeyFor(settings);
+    const errors: string[] = [];
+    let usdToTwd = fxRate?.usdToTwd;
+    let jpyToTwd = fxRate?.jpyToTwd;
+
     try {
-      const { price: usdToTwd } = await fetchTwelveDataQuote('USD/TWD', activeApiKeyFor(settings));
-      setFxRate({ usdToTwd, updatedAt: new Date().toISOString(), source: 'auto' });
+      usdToTwd = (await fetchTwelveDataQuote('USD/TWD', apiKey)).price;
     } catch (err) {
-      setError(err instanceof PriceFetchError ? err.message : '匯率刷新失敗');
-    } finally {
-      setIsRefreshing(false);
+      errors.push(err instanceof PriceFetchError ? err.message : 'USD/TWD 匯率刷新失敗');
     }
+    try {
+      jpyToTwd = (await fetchTwelveDataQuote('JPY/TWD', apiKey)).price;
+    } catch (err) {
+      errors.push(err instanceof PriceFetchError ? err.message : 'JPY/TWD 匯率刷新失敗');
+    }
+
+    if (usdToTwd !== undefined) {
+      setFxRate({ usdToTwd, jpyToTwd, updatedAt: new Date().toISOString(), source: 'auto' });
+    }
+    setError(errors.join('；'));
+    setIsRefreshing(false);
   };
 
   useEffect(() => {
@@ -45,7 +60,8 @@ export function useFxRate() {
   }, [canAutoFetch]);
 
   const effectiveUsdToTwd = fxRate?.usdToTwd ?? null;
+  const effectiveJpyToTwd = fxRate?.jpyToTwd ?? null;
   const updatedAt = fxRate?.updatedAt ?? null;
 
-  return { refreshFxRate, isRefreshing, error, canAutoFetch, effectiveUsdToTwd, updatedAt };
+  return { refreshFxRate, isRefreshing, error, canAutoFetch, effectiveUsdToTwd, effectiveJpyToTwd, updatedAt };
 }

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { PortfolioSummary } from './PortfolioSummary';
 import { CurrencyBreakdown } from './CurrencyBreakdown';
+import { CashLedgerCard } from './CashLedgerCard';
 import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useCashLedger } from '../hooks/useCashLedger';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { usePortfolio } from '../context/PortfolioContext';
 
@@ -24,6 +26,7 @@ export function Layout() {
   // call these itself for its manual buttons/status display.
   usePrices();
   useAutoSync();
+  useCashLedger();
   useRemoteSnapshots();
 
   // 'system' leaves no data-theme attribute set, so the OS-driven
@@ -62,6 +65,7 @@ export function Layout() {
           <>
             <PortfolioSummary />
             <CurrencyBreakdown />
+            <CashLedgerCard />
             <AllocationBubbleChart />
             <TrendChart />
             <HoldingsTable />

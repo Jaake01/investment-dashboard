@@ -55,6 +55,11 @@ export interface Settings {
   // TW stock quotes — Finnhub/Twelve Data's free tiers don't reliably cover
   // TWSE. Takes priority over priceProvider for tw_stock holdings.
   twQuoteSheetUrl: string;
+  // Optional: CSV published from a "現金帳戶" Google Sheet tab — an
+  // append-only cash ledger (date/currency/type/amount/note) kept in sync
+  // with the 交易紀錄 tab via an Apps Script trigger. Summed by currency to
+  // show current cash balances, independent of any 現金-class Holding.
+  cashLedgerSheetUrl: string;
   // 'system' follows the OS/browser prefers-color-scheme; 'light'/'dark' force it.
   theme: Theme;
 }
@@ -89,6 +94,9 @@ export interface PriceEntry {
 
 export interface FxRate {
   usdToTwd: number;
+  // Optional since it's fetched independently of usdToTwd — one can succeed
+  // while the other fails, or this simply hasn't been fetched yet.
+  jpyToTwd?: number;
   updatedAt: string;
   source: 'auto';
 }

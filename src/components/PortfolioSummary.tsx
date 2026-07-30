@@ -1,15 +1,30 @@
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeHoldingMetrics, computePreviousSnapshotValue, computeTotalCostInTwd, computeTotalInTwd } from '../lib/calculations';
+import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { formatCurrencyIn, formatPercent } from '../lib/format';
 
+// null (rate missing for some Holding) stays null rather than silently
+// showing a partial total for 總市值/總成本 — matches computeTotalInTwd's
+// existing all-or-nothing convention.
+function addTwd(base: number | null, delta: number): number | null {
+  return base === null ? null : base + delta;
+}
+
 export function PortfolioSummary() {
-  const { holdings, prices, snapshots } = usePortfolio();
-  const { effectiveUsdToTwd } = useFxRate();
+  const { holdings, prices, snapshots, cashBalances } = usePortfolio();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
 
-  const totalMarketValue = computeTotalInTwd(metrics, effectiveUsdToTwd);
-  const totalCostValue = computeTotalCostInTwd(metrics, effectiveUsdToTwd);
+  // Cash-ledger balances (see CashLedgerCard) aren't Holdings, so they don't
+  // flow through computeTotalInTwd/computeTotalCostInTwd — added on top here
+  // instead. A cash balance has no cost basis of its own, so it contributes
+  // equally to market value and cost value (zero gain/loss), same treatment
+  // as the 現金 tab's total row in HoldingsTable.
+  const cashLedgerTwd = computeCashLedgerTwdTotal(cashBalances, effectiveUsdToTwd, effectiveJpyToTwd);
+
+  const totalMarketValue = addTwd(computeTotalInTwd(metrics, effectiveUsdToTwd), cashLedgerTwd);
+  const totalCostValue = addTwd(computeTotalCostInTwd(metrics, effectiveUsdToTwd), cashLedgerTwd);
   const totalGainLoss = totalMarketValue !== null && totalCostValue !== null ? totalMarketValue - totalCostValue : null;
   const totalGainLossPct = totalGainLoss !== null && totalCostValue ? (totalGainLoss / totalCostValue) * 100 : 0;
   const isGain = (totalGainLoss ?? 0) >= 0;

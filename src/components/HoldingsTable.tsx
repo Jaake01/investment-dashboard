@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
-import { computeClassTotals, computeHoldingMetrics, type HoldingMetrics } from '../lib/calculations';
+import { useFxRate } from '../hooks/useFxRate';
+import { computeClassTotals, computeHoldingMetrics, convertToTwd, currencyFor, type HoldingMetrics } from '../lib/calculations';
 import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
 import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
@@ -11,6 +12,14 @@ type SortKey = 'symbol' | 'price' | 'change' | 'shares' | 'avgCost' | 'costValue
 interface Row {
   m: HoldingMetrics;
   changePercent?: number;
+  // True for a 現金-classified holding whose auto-detected currency isn't
+  // TWD (see currencyFor) — its 總成本/市值/損益 get shown as their TWD
+  // equivalent instead of the raw native number, since the 現金 tab can mix
+  // TWD cash with USD-auto-detected holdings side by side.
+  isForeignCash: boolean;
+  displayCostValue: number | null;
+  displayMarketValue: number | null;
+  displayGainLoss: number | null;
 }
 
 function sortValue(row: Row, key: SortKey): number | string | undefined {
@@ -26,11 +35,11 @@ function sortValue(row: Row, key: SortKey): number | string | undefined {
     case 'avgCost':
       return row.m.holding.avgCost;
     case 'costValue':
-      return row.m.costValue;
+      return row.displayCostValue ?? undefined;
     case 'marketValue':
-      return row.m.marketValue;
+      return row.displayMarketValue ?? undefined;
     case 'gainLoss':
-      return row.m.gainLoss;
+      return row.displayGainLoss ?? undefined;
     case 'gainLossPct':
       return row.m.gainLossPct;
   }
@@ -66,6 +75,7 @@ interface OpenMenu {
 
 export function HoldingsTable() {
   const { holdings, prices, deleteHolding } = usePortfolio();
+  const { effectiveUsdToTwd } = useFxRate();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
@@ -101,12 +111,20 @@ export function HoldingsTable() {
     .filter((h) => h.assetClass === selectedClass)
     .map((h) => computeHoldingMetrics(h, prices));
 
-  const rows: Row[] = metrics.map((m) => ({
-    m,
-    changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
-  }));
+  const rows: Row[] = metrics.map((m) => {
+    const currency = currencyFor(m.holding);
+    const isForeignCash = m.holding.assetClass === 'cash' && currency !== 'TWD';
+    return {
+      m,
+      changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
+      isForeignCash,
+      displayCostValue: isForeignCash ? convertToTwd(m.costValue, currency, effectiveUsdToTwd) : m.costValue,
+      displayMarketValue: isForeignCash ? convertToTwd(m.marketValue, currency, effectiveUsdToTwd) : m.marketValue,
+      displayGainLoss: isForeignCash ? convertToTwd(m.gainLoss, currency, effectiveUsdToTwd) : m.gainLoss,
+    };
+  });
   const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
-  const totals = computeClassTotals(metrics);
+  const totals = computeClassTotals(metrics, effectiveUsdToTwd);
 
   return (
     <section className="card">
@@ -169,21 +187,22 @@ export function HoldingsTable() {
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map(({ m, changePercent }) => {
+              {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
                 const isGain = m.gainLoss >= 0;
                 const isMenuOpen = openMenu?.id === m.holding.id;
+                const unitSuffix = isForeignCash ? ' U' : '';
                 return (
                   <tr key={m.holding.id}>
                     <td>{m.holding.symbol || '—'}</td>
-                    <td>{formatDollar(m.currentPrice)}</td>
+                    <td>{formatDollar(m.currentPrice)}{unitSuffix}</td>
                     <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
                       {changePercent === undefined ? '—' : formatPercent(changePercent)}
                     </td>
                     <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
-                    <td>{formatDollar(m.holding.avgCost)}</td>
-                    <td>{formatDollar(m.costValue)}</td>
-                    <td>{formatDollar(m.marketValue)}</td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{formatSignedNumber(m.gainLoss)}</td>
+                    <td>{formatDollar(m.holding.avgCost)}{unitSuffix}</td>
+                    <td>{displayCostValue === null ? '—' : formatDollar(displayCostValue)}</td>
+                    <td>{displayMarketValue === null ? '—' : formatDollar(displayMarketValue)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{displayGainLoss === null ? '—' : formatSignedNumber(displayGainLoss)}</td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
                     <td className="row-actions">
                       {m.holding.symbol && (
@@ -251,7 +270,7 @@ export function HoldingsTable() {
             </tbody>
             <tfoot>
               <tr className="holdings-total-row">
-                <td>總計</td>
+                <td>{selectedClass === 'cash' ? '總計（台幣 NTD）' : '總計'}</td>
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>

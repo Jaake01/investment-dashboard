@@ -224,12 +224,20 @@ export interface ClassTotals {
   totalGainLossPct: number;
 }
 
-// Native-currency totals across metrics sharing the same asset class (unlike
-// the portfolio-wide TWD totals below, no FX conversion is needed here since
-// callers only ever pass metrics already filtered to one class/currency).
-export function computeClassTotals(metrics: HoldingMetrics[]): ClassTotals {
-  const totalCostValue = metrics.reduce((sum, m) => sum + m.costValue, 0);
-  const totalMarketValue = metrics.reduce((sum, m) => sum + m.marketValue, 0);
+// Native-currency totals across metrics sharing the same asset class — no FX
+// conversion needed for us_stock/tw_stock/crypto tabs (already one currency
+// each), but 現金 can mix TWD cash with USD-auto-detected holdings (see
+// currencyFor), so those get converted to TWD before summing so the total
+// means something.
+export function computeClassTotals(metrics: HoldingMetrics[], usdToTwd: number | null = null): ClassTotals {
+  const valueFor = (raw: number, m: HoldingMetrics) => {
+    if (m.holding.assetClass !== 'cash') return raw;
+    const currency = currencyFor(m.holding);
+    if (currency === 'TWD') return raw;
+    return convertToTwd(raw, currency, usdToTwd) ?? raw;
+  };
+  const totalCostValue = metrics.reduce((sum, m) => sum + valueFor(m.costValue, m), 0);
+  const totalMarketValue = metrics.reduce((sum, m) => sum + valueFor(m.marketValue, m), 0);
   const totalGainLoss = totalMarketValue - totalCostValue;
   const totalGainLossPct = totalCostValue !== 0 ? (totalGainLoss / totalCostValue) * 100 : 0;
   return { totalCostValue, totalMarketValue, totalGainLoss, totalGainLossPct };

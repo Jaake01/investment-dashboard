@@ -1,8 +1,41 @@
 import Papa from 'papaparse';
 import { CsvImportError } from './csv';
+import { formatCurrencyIn } from './format';
 
 function normalizeHeader(header: string): string {
   return header.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+// Preferred display order for cash-ledger currencies; anything else (a 5th
+// currency someone starts using in the sheet) sorts alphabetically after.
+export const CASH_CURRENCY_ORDER = ['TWD', 'USD', 'USDT', 'JPY'];
+
+const jpyFormatter = new Intl.NumberFormat('zh-TW', {
+  style: 'currency',
+  currency: 'JPY',
+  maximumFractionDigits: 0,
+});
+
+const plainNumberFormatter = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
+
+// TWD/USD go through formatCurrencyIn (existing Currency type); USDT and any
+// other currency the ledger might use aren't part of that type, so they're
+// shown as a plain number + code, same convention as USDC elsewhere.
+export function formatCashAmount(amount: number, currency: string): string {
+  if (currency === 'TWD') return formatCurrencyIn(amount, 'TWD');
+  if (currency === 'USD') return formatCurrencyIn(amount, 'USD');
+  if (currency === 'JPY') return jpyFormatter.format(amount);
+  return `${plainNumberFormatter.format(amount)} ${currency}`;
+}
+
+// USDT is treated 1:1 with USD for TWD conversion, same as USDC is treated
+// 1:1 with USD elsewhere in this app (see calculations.ts's convertToTwd).
+// Returns null when the currency needs a rate that hasn't been fetched yet.
+export function twdRateForCashCurrency(currency: string, usdToTwd: number | null, jpyToTwd: number | null): number | null {
+  if (currency === 'TWD') return 1;
+  if (currency === 'USD' || currency === 'USDT') return usdToTwd;
+  if (currency === 'JPY') return jpyToTwd;
+  return null;
 }
 
 export interface CashLedgerEntry {

@@ -4,6 +4,7 @@ import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeClassTotals, computeHoldingMetrics, convertToTwd, currencyFor, type HoldingMetrics } from '../lib/calculations';
 import { formatDollar, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
+import { CASH_CURRENCY_ORDER, formatCashAmount, twdRateForCashCurrency } from '../lib/cashLedger';
 import { ASSET_CLASS_LABELS, type AssetClass } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
@@ -74,8 +75,8 @@ interface OpenMenu {
 }
 
 export function HoldingsTable() {
-  const { holdings, prices, deleteHolding } = usePortfolio();
-  const { effectiveUsdToTwd } = useFxRate();
+  const { holdings, prices, cashBalances, deleteHolding } = usePortfolio();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
@@ -126,6 +127,45 @@ export function HoldingsTable() {
   const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
   const totals = computeClassTotals(metrics, effectiveUsdToTwd);
 
+  // The 現金帳戶 ledger (see CashLedgerCard) tracks raw currency balances
+  // separately from 現金-classified Holdings like STRC/0056 (real securities
+  // someone just groups under 現金) — shown here as extra, non-editable rows
+  // so the 現金 tab reflects true liquidity, not just invested-in-cash
+  // positions. Pinned after the sortable rows rather than folded into them,
+  // since there's no real Holding/id backing them (nothing to sort by
+  // price/edit/delete). A balance has no cost basis of its own, so it
+  // contributes equally to cost and market value (zero gain/loss) in the
+  // footer total below.
+  const cashBalanceEntries =
+    selectedClass === 'cash'
+      ? Object.entries(cashBalances)
+          .filter(([, amount]) => amount !== 0)
+          .sort(([a], [b]) => {
+            const ai = CASH_CURRENCY_ORDER.indexOf(a);
+            const bi = CASH_CURRENCY_ORDER.indexOf(b);
+            if (ai === -1 && bi === -1) return a.localeCompare(b);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+          })
+      : [];
+  let cashBalanceTwdTotal = 0;
+  const cashBalanceRows = cashBalanceEntries.map(([currency, amount]) => {
+    const rate = twdRateForCashCurrency(currency, effectiveUsdToTwd, effectiveJpyToTwd);
+    const twdValue = rate === null ? null : amount * rate;
+    if (twdValue !== null) cashBalanceTwdTotal += twdValue;
+    return { currency, amount, twdValue };
+  });
+  const combinedTotals = {
+    totalCostValue: totals.totalCostValue + cashBalanceTwdTotal,
+    totalMarketValue: totals.totalMarketValue + cashBalanceTwdTotal,
+    totalGainLoss: totals.totalGainLoss,
+    totalGainLossPct:
+      totals.totalCostValue + cashBalanceTwdTotal !== 0
+        ? (totals.totalGainLoss / (totals.totalCostValue + cashBalanceTwdTotal)) * 100
+        : 0,
+  };
+
   return (
     <section className="card">
       <div className="card-header">
@@ -147,9 +187,9 @@ export function HoldingsTable() {
         ))}
       </div>
 
-      {holdings.length === 0 ? (
+      {holdings.length === 0 && cashBalanceEntries.length === 0 ? (
         <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
-      ) : metrics.length === 0 ? (
+      ) : metrics.length === 0 && cashBalanceEntries.length === 0 ? (
         <p className="empty-state">「{ASSET_CLASS_LABELS[selectedClass]}」目前沒有持股。</p>
       ) : (
         <div className="table-scroll">
@@ -267,6 +307,20 @@ export function HoldingsTable() {
                   </tr>
                 );
               })}
+              {cashBalanceRows.map(({ currency, amount, twdValue }) => (
+                <tr key={`cash-balance-${currency}`} className="cash-balance-row">
+                  <td>{currency}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>{formatCashAmount(amount, currency)}</td>
+                  <td>—</td>
+                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
+                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
+                  <td className="change-up">{twdValue === null ? '—' : '0'}</td>
+                  <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
+                  <td></td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr className="holdings-total-row">
@@ -275,13 +329,13 @@ export function HoldingsTable() {
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>
-                <td>{formatDollar(totals.totalCostValue)}</td>
-                <td>{formatDollar(totals.totalMarketValue)}</td>
-                <td className={totals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                  {formatSignedNumber(totals.totalGainLoss)}
+                <td>{formatDollar(combinedTotals.totalCostValue)}</td>
+                <td>{formatDollar(combinedTotals.totalMarketValue)}</td>
+                <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                  {formatSignedNumber(combinedTotals.totalGainLoss)}
                 </td>
-                <td className={totals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                  {formatPercent(totals.totalGainLossPct)}
+                <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                  {formatPercent(combinedTotals.totalGainLossPct)}
                 </td>
                 <td></td>
               </tr>

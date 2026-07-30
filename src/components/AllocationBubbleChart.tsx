@@ -9,6 +9,7 @@ import {
   computePreviousClassValue,
   computePreviousSymbolValue,
   convertToTwd,
+  currencyFor,
   type HoldingMetrics,
 } from '../lib/calculations';
 import { formatCurrencyIn, formatPercent } from '../lib/format';
@@ -82,7 +83,7 @@ function buildBubbleData(
       // Combined view mixes currencies, so it converts to TWD (falling back
       // to the native value when no FX rate is available yet, same as
       // computeAllocation). A single-class view is already one currency.
-      value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, m.holding.assetClass, usdToTwd) ?? m.marketValue),
+      value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
     }));
   const total = entries.reduce((sum, e) => sum + e.value, 0);
   return entries

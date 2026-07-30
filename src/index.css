@@ -335,6 +335,10 @@ th {
   border-top: 2px solid var(--border);
 }
 
+.cash-balance-row td {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+}
+
 .row-actions {
   display: flex;
   gap: 6px;

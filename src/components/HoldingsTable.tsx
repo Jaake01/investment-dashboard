@@ -131,9 +131,9 @@ export function HoldingsTable() {
   // separately from 現金-classified Holdings like STRC/0056 (real securities
   // someone just groups under 現金) — shown here as extra, non-editable rows
   // so the 現金 tab reflects true liquidity, not just invested-in-cash
-  // positions. Pinned after the sortable rows rather than folded into them,
-  // since there's no real Holding/id backing them (nothing to sort by
-  // price/edit/delete). A balance has no cost basis of its own, so it
+  // positions. Pinned at the top, ahead of the sortable rows, rather than
+  // folded into them, since there's no real Holding/id backing them (nothing
+  // to sort by price/edit/delete). A balance has no cost basis of its own, so it
   // contributes equally to cost and market value (zero gain/loss) in the
   // footer total below.
   const cashBalanceEntries =
@@ -227,6 +227,20 @@ export function HoldingsTable() {
               </tr>
             </thead>
             <tbody>
+              {cashBalanceRows.map(({ currency, amount, twdValue }) => (
+                <tr key={`cash-balance-${currency}`} className="cash-balance-row">
+                  <td>{currency}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>{formatCashAmount(amount, currency)}</td>
+                  <td>—</td>
+                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
+                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
+                  <td className="change-up">{twdValue === null ? '—' : '0'}</td>
+                  <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
+                  <td></td>
+                </tr>
+              ))}
               {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
                 const isGain = m.gainLoss >= 0;
                 const isMenuOpen = openMenu?.id === m.holding.id;
@@ -307,20 +321,6 @@ export function HoldingsTable() {
                   </tr>
                 );
               })}
-              {cashBalanceRows.map(({ currency, amount, twdValue }) => (
-                <tr key={`cash-balance-${currency}`} className="cash-balance-row">
-                  <td>{currency}</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>{formatCashAmount(amount, currency)}</td>
-                  <td>—</td>
-                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
-                  <td>{twdValue === null ? '—' : formatDollar(twdValue)}</td>
-                  <td className="change-up">{twdValue === null ? '—' : '0'}</td>
-                  <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
-                  <td></td>
-                </tr>
-              ))}
             </tbody>
             <tfoot>
               <tr className="holdings-total-row">

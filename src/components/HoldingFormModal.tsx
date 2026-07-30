@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
-import { ASSET_CLASSES, ASSET_CLASS_LABELS, type AssetClass } from '../types';
+import { ASSET_CLASSES, ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass } from '../types';
 import { guessAssetClassFromSymbol } from '../lib/symbolClass';
+import { currencyFor, currentPriceFor } from '../lib/calculations';
 
 interface HoldingFormModalProps {
   editingId: string | null;
@@ -9,7 +10,7 @@ interface HoldingFormModalProps {
 }
 
 export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) {
-  const { holdings, addHolding, updateHolding } = usePortfolio();
+  const { holdings, prices, addHolding, updateHolding } = usePortfolio();
   const editingHolding = editingId ? holdings.find((h) => h.id === editingId) : undefined;
 
   const [symbol, setSymbol] = useState(editingHolding?.symbol ?? '');
@@ -19,7 +20,17 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
   // Once true, the class dropdown won't be overwritten by symbol-based guessing anymore.
   const [classTouched, setClassTouched] = useState(!!editingHolding);
   const [notes, setNotes] = useState(editingHolding?.notes ?? '');
+  const [deductFromCash, setDeductFromCash] = useState(false);
+  const [deductSourceId, setDeductSourceId] = useState('');
   const [error, setError] = useState('');
+
+  // Only offered when adding a brand-new non-cash holding, so "buying" cash
+  // with cash or nudging an existing position via edit never triggers this.
+  // Candidates are restricted to the purchase's own currency — deducting TWD
+  // cash to fund a USD buy would need an FX conversion this feature doesn't do.
+  const cashDeductionCandidates = !editingHolding && assetClass !== 'cash'
+    ? holdings.filter((h) => h.assetClass === 'cash' && currencyFor(h) === CURRENCY_FOR_ASSET_CLASS[assetClass])
+    : [];
 
   const handleSymbolChange = (value: string) => {
     setSymbol(value);
@@ -45,6 +56,10 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
       setError('平均成本必須是有效數字');
       return;
     }
+    if (deductFromCash && !deductSourceId) {
+      setError('請選擇要扣款的現金持股');
+      return;
+    }
 
     const input = {
       symbol: symbol.trim().toUpperCase(),
@@ -58,6 +73,15 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
       updateHolding(editingHolding.id, input);
     } else {
       addHolding(input);
+      if (deductFromCash && deductSourceId) {
+        const source = holdings.find((h) => h.id === deductSourceId);
+        if (source) {
+          const purchaseCost = sharesNum * avgCostNum;
+          const { price: sourcePrice } = currentPriceFor(source, prices);
+          const deductShares = purchaseCost / sourcePrice;
+          updateHolding(source.id, { shares: source.shares - deductShares });
+        }
+      }
     }
     onClose();
   };
@@ -111,6 +135,35 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
             備註（選填）
             <input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
+
+          {cashDeductionCandidates.length > 0 && (
+            <>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={deductFromCash}
+                  onChange={(e) => {
+                    setDeductFromCash(e.target.checked);
+                    if (!e.target.checked) setDeductSourceId('');
+                  }}
+                />
+                同時從現金扣款
+              </label>
+              {deductFromCash && (
+                <label>
+                  扣款來源
+                  <select value={deductSourceId} onChange={(e) => setDeductSourceId(e.target.value)}>
+                    <option value="">請選擇</option>
+                    {cashDeductionCandidates.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.symbol || '現金餘額'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </>
+          )}
 
           {error && <p className="form-error">{error}</p>}
 

@@ -45,7 +45,7 @@ export function CurrencyBreakdown() {
               <span className="summary-value">
                 {bucket.currency === 'TWD' ? formatTwd(bucket.nativeTotal) : formatCurrencyIn(bucket.nativeTotal, bucket.currency)}
               </span>
-              {percentOfTotal !== null && <span className="summary-sub">占總資產 {percentOfTotal.toFixed(1)}%</span>}
+              {percentOfTotal !== null && <span className="summary-sub">{percentOfTotal.toFixed(1)}%</span>}
             </div>
           );
         })}

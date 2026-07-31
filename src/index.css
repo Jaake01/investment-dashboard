@@ -339,15 +339,15 @@ th {
   background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
 }
 
-/* Currency label and value as two ends of a flex row, so the label lines up
-   down the column regardless of its width ("$" vs "US$") and the digits
-   line up regardless of their count. */
+/* Label and value sit close together as one right-aligned group (inherits
+   text-align: right from the cell) rather than stretched to the column's
+   full width — the earlier full-width spread put an oversized gap between
+   a short label like "$" and the number in wide columns. */
 .money-cell {
-  display: flex;
-  width: 100%;
+  display: inline-flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 3px;
 }
 
 .money-unit {

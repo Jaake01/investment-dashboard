@@ -24,6 +24,14 @@ const roundedSharesFormatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 1,
 });
 
+// Tiered precision — fewer decimals as the integer part gets wider, so a
+// value keeps roughly the same number of significant digits whether it's a
+// sub-$10 price/quantity or a $1000+ one, instead of a fixed decimal count
+// that's either noisy for small values or falsely precise for large ones.
+const tier1Formatter = new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const tier2Formatter = new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const tier3Formatter = new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 export function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
 }
@@ -47,10 +55,21 @@ export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }
 
-// Crypto commonly needs sub-1 precision (e.g. 0.05 BTC) to stay meaningful;
-// other asset classes round to a tidier 1 decimal place.
+// <10: 3 decimals, <100: 2, <1000: 1, >=1000: whole number.
+export function formatTiered(value: number): string {
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs < 10) return `${sign}${tier1Formatter.format(abs)}`;
+  if (abs < 100) return `${sign}${tier2Formatter.format(abs)}`;
+  if (abs < 1000) return `${sign}${tier3Formatter.format(abs)}`;
+  return `${sign}${usdcNumberFormatter.format(abs)}`;
+}
+
+// Crypto commonly needs sub-1 precision (e.g. 0.05 BTC) to stay meaningful,
+// so it uses the same tiered precision as price/avgCost; other asset
+// classes round to a tidier fixed 1 decimal place.
 export function formatShares(value: number, assetClass: AssetClass): string {
-  return assetClass === 'crypto' ? numberFormatter.format(value) : roundedSharesFormatter.format(value);
+  return assetClass === 'crypto' ? formatTiered(value) : roundedSharesFormatter.format(value);
 }
 
 // Signed plain number, no currency symbol — used for 損益 where the $/NT$/U

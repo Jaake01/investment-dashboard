@@ -3,28 +3,33 @@ import { createPortal } from 'react-dom';
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeClassTotals, computeHoldingMetrics, convertToTwd, currencyFor, type HoldingMetrics } from '../lib/calculations';
-import { formatAmount, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
+import { formatAmount, formatShares, formatPercent, formatSignedNumber, formatTiered, googleNewsUrlFor } from '../lib/format';
 import { CASH_CURRENCY_ORDER, twdRateForCashCurrency } from '../lib/cashLedger';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency, type Holding, type PriceEntry } from '../types';
+import { ASSET_CLASS_LABELS, type AssetClass, type Holding, type PriceEntry } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
-// Currency label shown as its own left-aligned column next to a value (see
-// .money-cell in index.css), rather than baked into the formatted string —
-// so both the label and the digits line up down the column regardless of
-// label width ("$" vs "US$") or digit count.
-const MONEY_UNIT: Record<Currency, string> = { TWD: '$', USD: 'US$', USDC: 'U' };
+// Every tab except 現金 is already a single, unambiguous currency (the tab
+// itself gives the context), so those just use a plain "$". Only 現金 mixes
+// currencies (TWD cash alongside a USD-auto-detected holding like STRC, or
+// raw ledger balances in any of TWD/USD/USDT/JPY — see currencyFor), so it's
+// the one place that needs a differentiated label per row. USDT is pegged
+// 1:1 to USD (see twdRateForCashCurrency) and gets the same "US$" for that
+// reason; a TWD-equivalent value (e.g. a converted STRC row, or a ledger
+// balance's 總成本/市值) always reads "TW$".
+const CASH_TAB_UNIT: Record<string, string> = { TWD: 'TW$', USD: 'US$', USDT: 'US$', JPY: 'JP¥' };
 
-// Cash-ledger balances use plain currency codes rather than the app's
-// Currency type. USDT is pegged 1:1 to USD (see twdRateForCashCurrency) and
-// gets the same "US$" label for that reason.
-const CASH_UNIT: Record<string, string> = { TWD: '$', USD: 'US$', USDT: 'US$', JPY: '¥' };
-
-function Money({ unit, value, signed }: { unit: string; value: number | null; signed?: boolean }) {
+// The label is its own flex item next to the value (see .money-cell in
+// index.css) rather than baked into the formatted string, so the label and
+// the digits both stay tight and legible regardless of label width ("$" vs
+// "US$") or digit count. `tiered` switches to formatTiered's shrinking
+// decimal precision, used for 現價/平均成本 and crypto 數量.
+function Money({ unit, value, signed, tiered }: { unit: string; value: number | null; signed?: boolean; tiered?: boolean }) {
   if (value === null) return <span className="money-cell"><span className="money-num">—</span></span>;
+  const text = signed ? formatSignedNumber(value) : tiered ? formatTiered(value) : formatAmount(value);
   return (
     <span className="money-cell">
       <span className="money-unit">{unit}</span>
-      <span className="money-num">{signed ? formatSignedNumber(value) : formatAmount(value)}</span>
+      <span className="money-num">{text}</span>
     </span>
   );
 }
@@ -161,9 +166,8 @@ function buildTabData(
         : 0,
   };
   // 現金 tab totals are normalized to TWD (see computeClassTotals); every
-  // other tab holds one native currency throughout, so the footer keeps
-  // that tab's own label instead of assuming TWD.
-  const footerUnit = MONEY_UNIT[tab === 'cash' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[tab]];
+  // other tab is a plain "$" (see CASH_TAB_UNIT above).
+  const footerUnit = tab === 'cash' ? CASH_TAB_UNIT.TWD : '$';
 
   return { metrics, sortedRows, cashBalanceEntries, cashBalanceRows, combinedTotals, footerUnit };
 }
@@ -300,32 +304,36 @@ export function HoldingsTable() {
                           <td>{currency}</td>
                           <td>—</td>
                           <td>—</td>
-                          <td><Money unit={CASH_UNIT[currency] ?? currency} value={amount} /></td>
+                          <td><Money unit={CASH_TAB_UNIT[currency] ?? currency} value={amount} /></td>
                           <td>—</td>
-                          <td><Money unit="$" value={twdValue} /></td>
-                          <td><Money unit="$" value={twdValue} /></td>
-                          <td className="change-up"><Money unit="$" value={twdValue === null ? null : 0} signed /></td>
-                          <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
+                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} /></td>
+                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} /></td>
+                          {/* A ledger balance has no 現價, so — like that column — 損益/
+                              損益率 read as "not applicable" rather than a computed "0",
+                              which would wrongly imply a real gain/loss calculation ran. */}
+                          <td>—</td>
+                          <td>—</td>
                           <td></td>
                         </tr>
                       ))}
                       {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
                         const isGain = m.gainLoss >= 0;
                         const isMenuOpen = openMenu?.id === m.holding.id;
-                        const nativeUnit = MONEY_UNIT[currencyFor(m.holding)];
+                        // Every tab except 現金 is a plain "$" (see CASH_TAB_UNIT above).
+                        const nativeUnit = tab === 'cash' ? CASH_TAB_UNIT[currencyFor(m.holding)] : '$';
                         // isForeignCash rows have already been converted to their TWD
                         // equivalent above (see the Row interface), so their 總成本/
                         // 市值/損益 columns get the TWD label instead of the native one.
-                        const displayUnit = isForeignCash ? MONEY_UNIT.TWD : nativeUnit;
+                        const displayUnit = isForeignCash ? CASH_TAB_UNIT.TWD : nativeUnit;
                         return (
                           <tr key={m.holding.id}>
                             <td>{m.holding.symbol || '—'}</td>
-                            <td><Money unit={nativeUnit} value={m.currentPrice} /></td>
+                            <td><Money unit={nativeUnit} value={m.currentPrice} tiered /></td>
                             <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
                               {changePercent === undefined ? '—' : formatPercent(changePercent)}
                             </td>
                             <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
-                            <td><Money unit={nativeUnit} value={m.holding.avgCost} /></td>
+                            <td><Money unit={nativeUnit} value={m.holding.avgCost} tiered /></td>
                             <td><Money unit={displayUnit} value={displayCostValue} /></td>
                             <td><Money unit={displayUnit} value={displayMarketValue} /></td>
                             <td className={isGain ? 'change-up' : 'change-down'}><Money unit={displayUnit} value={displayGainLoss} signed /></td>

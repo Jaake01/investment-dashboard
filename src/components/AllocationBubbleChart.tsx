@@ -556,11 +556,6 @@ function buildPieData(
   });
 }
 
-// Below this share, an inline in-wedge label would be squeezed into an
-// unreadably thin slice — every slice still gets its full label+percent via
-// the leader line regardless of size, so nothing is lost by omitting this.
-const PIE_LABEL_MIN_PERCENT = 6;
-const MIN_RADIUS_FOR_INLINE_PIE_LABEL = 55;
 // Space reserved on each side of the circle for "edge → elbow → dot + text"
 // leader lines, so the pie always leaves room for its own labels instead of
 // them running off the SVG. The floor below covers the shortest realistic
@@ -625,29 +620,13 @@ function PieSlice({
   const end = polarPoint(cx, cy, radius, endAngle);
   const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
   const path = `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
-  const labelPoint = polarPoint(cx, cy, radius * 0.65, (startAngle + endAngle) / 2);
 
+  // No in-wedge percent text — every slice's leader line already carries its
+  // own label + percent, so a second copy on the wedge itself would just be
+  // the same figure twice.
   return (
     <g onMouseEnter={(e) => onHover(e, datum)} onMouseMove={(e) => onHover(e, datum)} onMouseLeave={onLeave}>
       <path d={path} style={{ fill: datum.fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
-      {/* Below this radius the wedges are too thin for a 15px label to fit
-          without overlapping its neighbor — the leader line still carries
-          the same figure regardless, so nothing is lost by skipping it. */}
-      {radius >= MIN_RADIUS_FOR_INLINE_PIE_LABEL && datum.percent >= PIE_LABEL_MIN_PERCENT && (
-        <text
-          x={labelPoint.x}
-          y={labelPoint.y}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="#fff"
-          fontSize={15}
-          fontWeight={700}
-          strokeWidth={2}
-          {...TEXT_OUTLINE}
-        >
-          {datum.percentLabel}
-        </text>
-      )}
     </g>
   );
 }

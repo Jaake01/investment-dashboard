@@ -556,14 +556,45 @@ function buildPieData(
   });
 }
 
-const PIE_SIZE = 320;
-const PIE_RADIUS = 130;
-// Below this share, an inline label would be squeezed into an unreadably
-// thin wedge — the legend still shows the exact figure either way.
-const PIE_LABEL_MIN_PERCENT = 6;
+// Space reserved on each side of the circle for "edge → elbow → dot + text"
+// leader lines, so the pie always leaves room for its own labels instead of
+// them running off the SVG. The floor below covers the shortest realistic
+// label; PieChartSvg grows it further based on each render's actual
+// (measured) longest label.
+const MIN_LABEL_RESERVE = 112;
+const PIE_LABEL_FONT_SIZE = 13;
+const LEADER_ELBOW_GAP = 18;
+const LEADER_DOT_GAP = 8;
+const LEADER_TEXT_GAP = 8;
+const LEADER_MIN_GAP = 22;
+const LEADER_DOT_RADIUS = 4;
 
 function polarPoint(cx: number, cy: number, r: number, angle: number) {
   return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+}
+
+// Leader-line label anchors start stacked at each slice's natural angle-based
+// height, then get nudged apart top-to-bottom so two labels never overlap —
+// same idea as map/chart callout labels. Assumes items are already sorted by
+// natural y (ascending) within a single side of the pie.
+function resolveLabelYs(naturalYs: number[], minY: number, maxY: number): number[] {
+  if (naturalYs.length === 0) return [];
+  const ys = [...naturalYs];
+  for (let i = 1; i < ys.length; i++) {
+    if (ys[i] - ys[i - 1] < LEADER_MIN_GAP) ys[i] = ys[i - 1] + LEADER_MIN_GAP;
+  }
+  // If stacking pushed the last label past the bottom edge, slide the whole
+  // group up just enough to fit — keeps every label inside the chart rather
+  // than clipping it.
+  const overflow = ys[ys.length - 1] - maxY;
+  if (overflow > 0) {
+    for (let i = 0; i < ys.length; i++) ys[i] -= overflow;
+  }
+  if (ys[0] < minY) {
+    const shift = minY - ys[0];
+    for (let i = 0; i < ys.length; i++) ys[i] += shift;
+  }
+  return ys;
 }
 
 function PieSlice({
@@ -572,6 +603,7 @@ function PieSlice({
   endAngle,
   cx,
   cy,
+  radius,
   onHover,
   onLeave,
 }: {
@@ -580,42 +612,49 @@ function PieSlice({
   endAngle: number;
   cx: number;
   cy: number;
+  radius: number;
   onHover: (e: MouseEvent, datum: PieDatum) => void;
   onLeave: () => void;
 }) {
-  const start = polarPoint(cx, cy, PIE_RADIUS, startAngle);
-  const end = polarPoint(cx, cy, PIE_RADIUS, endAngle);
+  const start = polarPoint(cx, cy, radius, startAngle);
+  const end = polarPoint(cx, cy, radius, endAngle);
   const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-  const path = `M ${cx} ${cy} L ${start.x} ${start.y} A ${PIE_RADIUS} ${PIE_RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
-  const labelPoint = polarPoint(cx, cy, PIE_RADIUS * 0.65, (startAngle + endAngle) / 2);
+  const path = `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
 
+  // No in-wedge percent text — every slice's leader line already carries its
+  // own label + percent, so a second copy on the wedge itself would just be
+  // the same figure twice.
   return (
     <g onMouseEnter={(e) => onHover(e, datum)} onMouseMove={(e) => onHover(e, datum)} onMouseLeave={onLeave}>
       <path d={path} style={{ fill: datum.fill, stroke: 'var(--card-bg)', strokeWidth: 2 }} />
-      {datum.percent >= PIE_LABEL_MIN_PERCENT && (
-        <text
-          x={labelPoint.x}
-          y={labelPoint.y}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="#fff"
-          fontSize={15}
-          fontWeight={700}
-          strokeWidth={2}
-          {...TEXT_OUTLINE}
-        >
-          {datum.percentLabel}
-        </text>
-      )}
     </g>
   );
 }
 
-function PieChartSvg({ data }: { data: PieDatum[] }) {
+function PieChartSvg({ data, width, height }: { data: PieDatum[]; width: number; height: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{ datum: PieDatum; left: number; top: number } | null>(null);
-  const cx = PIE_SIZE / 2;
-  const cy = PIE_SIZE / 2;
+  const cx = width / 2;
+  const cy = height / 2;
+  // A narrow card (e.g. phone width) gets a smaller label font so the
+  // measured reserve below — and therefore the pie itself — doesn't have to
+  // shrink as much to make room for it.
+  const labelFontSize = width < 480 ? 11 : PIE_LABEL_FONT_SIZE;
+  // Reserve exactly as much room as the widest label actually needs (measured,
+  // not guessed) — a fixed guess either clips long labels or wastes space on
+  // short ones.
+  const maxLabelTextWidth = Math.max(
+    0,
+    ...data.map((d) => measureTextWidth(`${d.label} · ${d.percentLabel}`, labelFontSize, 400)),
+  );
+  const labelReserve = Math.max(
+    MIN_LABEL_RESERVE,
+    LEADER_ELBOW_GAP + 14 + LEADER_DOT_RADIUS + LEADER_TEXT_GAP + maxLabelTextWidth + 10,
+  );
+  // The pie shrinks to make room for that reserve on both sides; it has a
+  // floor low enough that even a very narrow card still gets a legible
+  // circle rather than the layout breaking down.
+  const radius = Math.max(40, Math.min(150, Math.min(height, width - labelReserve * 2) / 2 - 20));
 
   const showTooltip = (e: MouseEvent, datum: PieDatum) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -626,14 +665,44 @@ function PieChartSvg({ data }: { data: PieDatum[] }) {
   let cursor = -Math.PI / 2;
   const slices = data.map((d) => {
     const sweep = (d.percent / 100) * Math.PI * 2;
-    const slice = { datum: d, startAngle: cursor, endAngle: cursor + sweep };
+    const slice = { datum: d, startAngle: cursor, endAngle: cursor + sweep, midAngle: cursor + sweep / 2 };
     cursor += sweep;
     return slice;
   });
 
+  // Each slice's leader line starts at its own angle on the circle, but the
+  // label itself always sits on a fixed left or right column outside the
+  // pie — same convention as a map callout — so text reads in a straight,
+  // scannable line instead of floating at whatever angle its slice happens
+  // to be at. The dot sits a small, fixed distance beyond the circle
+  // (independent of labelReserve) so the label text — which starts right
+  // after the dot and grows outward — always has the rest of labelReserve
+  // to itself, all the way to the card edge, regardless of card width.
+  const leaders = slices.map((s) => {
+    const side: 1 | -1 = Math.cos(s.midAngle) >= 0 ? 1 : -1;
+    const edge = polarPoint(cx, cy, radius, s.midAngle);
+    const elbow = polarPoint(cx, cy, radius + LEADER_ELBOW_GAP, s.midAngle);
+    const dotX = cx + side * (radius + LEADER_ELBOW_GAP + 14);
+    const stemX = dotX - side * LEADER_DOT_GAP;
+    return { ...s, side, edge, naturalY: elbow.y, stemX, dotX };
+  });
+
+  const minY = 16;
+  const maxY = height - 16;
+  const finalYByKey = new Map<AssetClass, number>();
+  for (const side of [-1, 1] as const) {
+    const group = leaders.filter((l) => l.side === side).sort((a, b) => a.naturalY - b.naturalY);
+    const resolved = resolveLabelYs(
+      group.map((l) => l.naturalY),
+      minY,
+      maxY,
+    );
+    group.forEach((l, i) => finalYByKey.set(l.datum.key, resolved[i]));
+  }
+
   return (
     <div ref={containerRef} className="pie-chart-wrap">
-      <svg width={PIE_SIZE} height={PIE_SIZE} viewBox={`0 0 ${PIE_SIZE} ${PIE_SIZE}`}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         {slices.map((s) => (
           <PieSlice
             key={s.datum.key}
@@ -642,19 +711,32 @@ function PieChartSvg({ data }: { data: PieDatum[] }) {
             endAngle={s.endAngle}
             cx={cx}
             cy={cy}
+            radius={radius}
             onHover={showTooltip}
             onLeave={() => setTooltip(null)}
           />
         ))}
+        {leaders.map((l) => {
+          const finalY = finalYByKey.get(l.datum.key) ?? l.naturalY;
+          const textX = l.dotX + l.side * (LEADER_DOT_RADIUS + LEADER_TEXT_GAP);
+          return (
+            <g key={l.datum.key} className="pie-leader" onMouseEnter={(e) => showTooltip(e, l.datum)} onMouseMove={(e) => showTooltip(e, l.datum)} onMouseLeave={() => setTooltip(null)}>
+              <polyline points={`${l.edge.x},${l.edge.y} ${l.stemX},${finalY} ${l.dotX},${finalY}`} fill="none" className="pie-leader-line" />
+              <circle cx={l.dotX} cy={finalY} r={LEADER_DOT_RADIUS} fill={l.datum.fill} />
+              <text
+                x={textX}
+                y={finalY}
+                textAnchor={l.side === 1 ? 'start' : 'end'}
+                dominantBaseline="central"
+                fontSize={labelFontSize}
+                className="pie-leader-label"
+              >
+                {l.datum.label} · {l.datum.percentLabel}
+              </text>
+            </g>
+          );
+        })}
       </svg>
-      <ul className="pie-legend">
-        {data.map((d) => (
-          <li key={d.key}>
-            <span className="pie-legend-dot" style={{ background: d.fill }} />
-            {d.label} · {d.percentLabel}
-          </li>
-        ))}
-      </ul>
       {tooltip && (
         <div className="bubble-tooltip" style={{ left: tooltip.left + 12, top: tooltip.top + 12 }}>
           <strong>{tooltip.datum.label}</strong>
@@ -740,7 +822,7 @@ export function AllocationBubbleChart() {
             {selectedClass ? '這個類別目前沒有持股。' : '新增持股並取得市值後即可看到配置圖表。'}
           </p>
         ) : showPie ? (
-          <PieChartSvg data={pieData} />
+          width > 0 && <PieChartSvg data={pieData} width={width} height={CHART_HEIGHT} />
         ) : (
           width > 0 && <BubbleChartSvg data={data} currency={currency} width={width} height={CHART_HEIGHT} />
         )}

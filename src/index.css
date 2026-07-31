@@ -356,23 +356,28 @@ th {
   font-variant-numeric: tabular-nums;
 }
 
-/* 現金 tab mixes several different-width labels (US$/TW$/JP¥) in the same
-   column, so the tight grouping above makes them drift left/right with the
-   number's digit count — see PR discussion. Give the label a fixed-width
-   column instead so it lines up down the column, accepting a variable gap
-   before short numbers as the tradeoff (same as Excel's Accounting format). */
-.table-panel[data-tab='cash'] .money-cell {
+/* Opt-in modifier (see Money's `alignUnit` prop) for a column where the same
+   unit repeats down several rows with widely different digit counts — e.g.
+   現金 tab's 數量/總成本/市值/損益 (130,000 next to 1,570,590 next to
+   62,726) — where the tight layout above makes the unit drift left/right
+   per row. Gives the label a fixed-width column instead so it lines up down
+   the column, accepting a variable gap before short numbers as the tradeoff
+   (same as Excel's Accounting format). Not applied to every column in a row
+   with mixed units (e.g. 現價/平均成本) — those are all similar-magnitude
+   prices with no drift problem, so aligning them would only open up the
+   "留白過大" gap this default layout exists to avoid. */
+.money-cell--aligned {
   display: flex;
   width: 100%;
   justify-content: normal;
 }
 
-.table-panel[data-tab='cash'] .money-unit {
+.money-cell--aligned .money-unit {
   width: 2.4em;
   text-align: left;
 }
 
-.table-panel[data-tab='cash'] .money-num {
+.money-cell--aligned .money-num {
   flex: 1 1 auto;
   text-align: right;
 }

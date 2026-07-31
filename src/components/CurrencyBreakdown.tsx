@@ -1,6 +1,7 @@
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import { computeCurrencyBuckets, computeHoldingMetrics, computeTotalInTwd, convertToTwd } from '../lib/calculations';
+import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { formatAmount, formatCurrencyIn } from '../lib/format';
 import { CURRENCY_LABELS } from '../types';
 
@@ -11,13 +12,24 @@ function formatTwd(value: number): string {
   return `TW$${formatAmount(value)}`;
 }
 
+// null (rate missing for some Holding) stays null rather than silently
+// showing a partial total — matches computeTotalInTwd's all-or-nothing
+// convention, same helper as PortfolioSummary's totalMarketValue.
+function addTwd(base: number | null, delta: number): number | null {
+  return base === null ? null : base + delta;
+}
+
 export function CurrencyBreakdown() {
-  const { holdings, prices } = usePortfolio();
-  const { effectiveUsdToTwd } = useFxRate();
+  const { holdings, prices, cashBalances } = usePortfolio();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
   const buckets = computeCurrencyBuckets(metrics);
-  const totalTwd = computeTotalInTwd(metrics, effectiveUsdToTwd);
+  // "占總資產" needs to mean the whole portfolio, not just the three buckets
+  // shown here — so the denominator also folds in the 現金帳戶 ledger
+  // balances (TWD/USD/USDT/JPY), same as PortfolioSummary's own total.
+  const cashLedgerTwd = computeCashLedgerTwdTotal(cashBalances, effectiveUsdToTwd, effectiveJpyToTwd);
+  const totalTwd = addTwd(computeTotalInTwd(metrics, effectiveUsdToTwd), cashLedgerTwd);
 
   return (
     <section className="card">

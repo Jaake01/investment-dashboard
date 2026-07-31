@@ -97,10 +97,12 @@ function buildCashBalanceEntries(
   const entries: { key: string; name: string; value: number }[] = [];
   for (const currency of currencies) {
     const amount = cashBalances[currency];
-    // Single-class (現金) drill-down shows native amounts, matching how
-    // STRC/0056 already render unconverted in that view; the combined "全部"
-    // view converts to TWD like every other class does there.
-    const rate = selectedClass ? 1 : twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    // Unlike every other class, 現金 itself mixes currencies (TWD/USD/USDT/
+    // JPY balances side by side), so — same as the combined "全部" view —
+    // this always converts to TWD rather than comparing raw currency units
+    // directly (comparing raw JPY-yen counts against raw USDT-token counts
+    // would make bubble sizes meaningless).
+    const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
     const value = rate === null ? null : amount * rate;
     if (value === null || value <= 0) continue;
     entries.push({ key: `cash-balance-${currency}`, name: `${currency} 現金`, value });
@@ -121,10 +123,16 @@ function buildBubbleData(
     .filter((m) => m.marketValue > 0)
     .map((m) => ({
       m,
-      // Combined view mixes currencies, so it converts to TWD (falling back
-      // to the native value when no FX rate is available yet, same as
-      // computeAllocation). A single-class view is already one currency.
-      value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
+      // Every single-class view except 現金 is already one currency and can
+      // use the native value as-is. 現金 can mix TWD cash with a
+      // USD-auto-detected holding like STRC (see currencyFor), so — like the
+      // combined "全部" view — it converts to TWD (falling back to the
+      // native value when no FX rate is available yet, same as
+      // computeAllocation).
+      value:
+        selectedClass && selectedClass !== 'cash'
+          ? m.marketValue
+          : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
     }));
   const cashEntries = buildCashBalanceEntries(selectedClass, cashBalances, usdToTwd, jpyToTwd);
   const total = entries.reduce((sum, e) => sum + e.value, 0) + cashEntries.reduce((sum, e) => sum + e.value, 0);
@@ -171,10 +179,11 @@ interface BubbleNode extends BubbleDatum {
   y: number;
 }
 
-// Compresses the size range so a small holding is still clearly visible next
-// to a large one (proportional, not to-scale) — a plain sqrt-of-value scale
-// would make the smallest slices disappear entirely.
-const SIZE_EXPONENT = 0.42;
+// 0.5 makes bubble *area* directly proportional to value (area = πr², and
+// r ∝ value^0.5 means area ∝ value) — the true reading of a bubble chart.
+// Anything lower visually flattens the differences between holdings, which
+// is what made very different-sized positions (e.g. 27% vs 3%) look similar.
+const SIZE_EXPONENT = 0.5;
 
 function layoutBubbles(data: BubbleDatum[], width: number, height: number): BubbleNode[] {
   if (data.length === 0 || width <= 0 || height <= 0) return [];
@@ -182,7 +191,7 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   // Radius bounds shrink a bit as the bubble count grows, so a long holdings
   // list still has a reasonable chance of fitting without heavy overlap.
-  const maxRadius = Math.max(28, Math.min(85, 360 / Math.sqrt(data.length)));
+  const maxRadius = Math.max(30, Math.min(105, 440 / Math.sqrt(data.length)));
   const minRadius = Math.max(19, maxRadius * 0.32);
 
   const classesPresent = ASSET_CLASSES.filter((c) => data.some((d) => d.assetClass === c));
@@ -192,8 +201,8 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   // width instead of bunching into a small circle in the middle, while still
   // pulling clusters close enough together to read as one connected group
   // rather than isolated islands with empty space between them.
-  const spreadX = width * 0.2;
-  const spreadY = height * 0.2;
+  const spreadX = width * 0.26;
+  const spreadY = height * 0.3;
   const anchors: Partial<Record<AssetClass, { x: number; y: number }>> = {};
   classesPresent.forEach((c, i) => {
     const angle = (i / classesPresent.length) * Math.PI * 2 - Math.PI / 2;
@@ -419,7 +428,7 @@ interface TooltipState {
   top: number;
 }
 
-const CHART_HEIGHT = 480;
+const CHART_HEIGHT = 580;
 
 // recharts v3's ResponsiveContainer only measures/sizes actual recharts chart
 // components (via an internal context), not arbitrary children — so a
@@ -737,7 +746,7 @@ export function AllocationBubbleChart() {
         )}
       </div>
 
-      {!selectedClass && effectiveUsdToTwd === null && !isEmpty && (
+      {(!selectedClass || selectedClass === 'cash') && (effectiveUsdToTwd === null || effectiveJpyToTwd === null) && !isEmpty && (
         <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>
       )}
     </section>

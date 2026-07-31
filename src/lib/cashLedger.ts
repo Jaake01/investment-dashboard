@@ -18,12 +18,13 @@ const jpyFormatter = new Intl.NumberFormat('zh-TW', {
 
 const plainNumberFormatter = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
 
-// TWD/USD go through formatCurrencyIn (existing Currency type); USDT and any
-// other currency the ledger might use aren't part of that type, so they're
-// shown as a plain number + code, same convention as USDC elsewhere.
+// TWD/USD go through formatCurrencyIn (existing Currency type). USDT is
+// pegged 1:1 with USD (see twdRateForCashCurrency below) and displayed the
+// same way — anything else the ledger might use falls back to a plain
+// number + code.
 export function formatCashAmount(amount: number, currency: string): string {
   if (currency === 'TWD') return formatCurrencyIn(amount, 'TWD');
-  if (currency === 'USD') return formatCurrencyIn(amount, 'USD');
+  if (currency === 'USD' || currency === 'USDT') return formatCurrencyIn(amount, 'USD');
   if (currency === 'JPY') return jpyFormatter.format(amount);
   return `${plainNumberFormatter.format(amount)} ${currency}`;
 }

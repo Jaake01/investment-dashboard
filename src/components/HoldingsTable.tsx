@@ -258,7 +258,7 @@ export function HoldingsTable() {
             sortDir,
           );
           return (
-            <div key={tab} className={`table-panel ${tab === selectedClass ? 'active' : ''}`}>
+            <div key={tab} data-tab={tab} className={`table-panel ${tab === selectedClass ? 'active' : ''}`}>
               {holdings.length === 0 && cashBalanceEntries.length === 0 ? (
                 <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
               ) : metrics.length === 0 && cashBalanceEntries.length === 0 ? (

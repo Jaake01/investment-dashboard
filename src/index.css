@@ -342,7 +342,9 @@ th {
 /* Label and value sit close together as one right-aligned group (inherits
    text-align: right from the cell) rather than stretched to the column's
    full width — the earlier full-width spread put an oversized gap between
-   a short label like "$" and the number in wide columns. */
+   a short label like "$" and the number in wide columns. Every non-現金 tab
+   uses a single constant "$" label, so this tight grouping never has an
+   alignment problem to begin with. */
 .money-cell {
   display: inline-flex;
   align-items: baseline;
@@ -358,6 +360,27 @@ th {
 
 .money-num {
   font-variant-numeric: tabular-nums;
+}
+
+/* 現金 tab mixes several different-width labels (US$/TW$/JP¥) in the same
+   column, so the tight grouping above makes them drift left/right with the
+   number's digit count — see PR discussion. Give the label a fixed-width
+   column instead so it lines up down the column, accepting a variable gap
+   before short numbers as the tradeoff (same as Excel's Accounting format). */
+.table-panel[data-tab='cash'] .money-cell {
+  display: flex;
+  width: 100%;
+  justify-content: normal;
+}
+
+.table-panel[data-tab='cash'] .money-unit {
+  width: 2.4em;
+  text-align: left;
+}
+
+.table-panel[data-tab='cash'] .money-num {
+  flex: 1 1 auto;
+  text-align: right;
 }
 
 /* Every tab's table is rendered simultaneously, all stacked in this single

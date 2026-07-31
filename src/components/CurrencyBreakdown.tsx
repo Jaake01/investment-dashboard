@@ -52,6 +52,10 @@ export function CurrencyBreakdown() {
         <div className="summary-stat">
           <span className="summary-label">總資產（台幣）</span>
           <span className="summary-value">{totalTwd === null ? '請先取得匯率' : formatTwd(totalTwd)}</span>
+          {/* Always exactly 100% by definition — shown anyway so the other
+              buckets' percentages read as shares of this whole instead of
+              floating numbers with no visible reference point. */}
+          {totalTwd !== null && totalTwd > 0 && <span className="summary-sub">100.0%</span>}
         </div>
       </div>
       {effectiveUsdToTwd === null && (

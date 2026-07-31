@@ -23,11 +23,34 @@ const CASH_TAB_UNIT: Record<string, string> = { TWD: 'TW$', USD: 'US$', USDT: 'U
 // the digits both stay tight and legible regardless of label width ("$" vs
 // "US$") or digit count. `tiered` switches to formatTiered's shrinking
 // decimal precision, used for 現價/平均成本 and crypto 數量.
-function Money({ unit, value, signed, tiered }: { unit: string; value: number | null; signed?: boolean; tiered?: boolean }) {
-  if (value === null) return <span className="money-cell"><span className="money-num">—</span></span>;
+//
+// `alignUnit` opts into a different layout: unit fixed at a consistent x
+// position, number right-aligned in the rest of the cell (see
+// .money-cell--aligned in index.css). Only worth it for a column where the
+// same unit repeats down several rows with widely different digit counts —
+// 現金 tab's 數量/總成本/市值/損益 (e.g. 130,000 next to 1,570,590 next to
+// 62,726) — where the tight, default layout makes the unit drift left/right
+// per row. 現價/平均成本 values are all similar-magnitude prices, so they
+// stay tight even in 現金 — aligning them would just open a gap for no
+// benefit, the same "留白過大" problem this default layout exists to avoid.
+function Money({
+  unit,
+  value,
+  signed,
+  tiered,
+  alignUnit,
+}: {
+  unit: string;
+  value: number | null;
+  signed?: boolean;
+  tiered?: boolean;
+  alignUnit?: boolean;
+}) {
+  const cellClass = alignUnit ? 'money-cell money-cell--aligned' : 'money-cell';
+  if (value === null) return <span className={cellClass}><span className="money-num">—</span></span>;
   const text = signed ? formatSignedNumber(value) : tiered ? formatTiered(value) : formatAmount(value);
   return (
-    <span className="money-cell">
+    <span className={cellClass}>
       <span className="money-unit">{unit}</span>
       <span className="money-num">{text}</span>
     </span>
@@ -258,7 +281,7 @@ export function HoldingsTable() {
             sortDir,
           );
           return (
-            <div key={tab} data-tab={tab} className={`table-panel ${tab === selectedClass ? 'active' : ''}`}>
+            <div key={tab} className={`table-panel ${tab === selectedClass ? 'active' : ''}`}>
               {holdings.length === 0 && cashBalanceEntries.length === 0 ? (
                 <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
               ) : metrics.length === 0 && cashBalanceEntries.length === 0 ? (
@@ -304,10 +327,10 @@ export function HoldingsTable() {
                           <td>{currency}</td>
                           <td>—</td>
                           <td>—</td>
-                          <td><Money unit={CASH_TAB_UNIT[currency] ?? currency} value={amount} /></td>
+                          <td><Money unit={CASH_TAB_UNIT[currency] ?? currency} value={amount} alignUnit /></td>
                           <td>—</td>
-                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} /></td>
-                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} /></td>
+                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} alignUnit /></td>
+                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} alignUnit /></td>
                           {/* A ledger balance has no 現價, so — like that column — 損益/
                               損益率 read as "not applicable" rather than a computed "0",
                               which would wrongly imply a real gain/loss calculation ran. */}
@@ -334,9 +357,11 @@ export function HoldingsTable() {
                             </td>
                             <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
                             <td><Money unit={nativeUnit} value={m.holding.avgCost} tiered /></td>
-                            <td><Money unit={displayUnit} value={displayCostValue} /></td>
-                            <td><Money unit={displayUnit} value={displayMarketValue} /></td>
-                            <td className={isGain ? 'change-up' : 'change-down'}><Money unit={displayUnit} value={displayGainLoss} signed /></td>
+                            <td><Money unit={displayUnit} value={displayCostValue} alignUnit={tab === 'cash'} /></td>
+                            <td><Money unit={displayUnit} value={displayMarketValue} alignUnit={tab === 'cash'} /></td>
+                            <td className={isGain ? 'change-up' : 'change-down'}>
+                              <Money unit={displayUnit} value={displayGainLoss} signed alignUnit={tab === 'cash'} />
+                            </td>
                             <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
                             <td className="row-actions">
                               {m.holding.symbol && (
@@ -409,10 +434,10 @@ export function HoldingsTable() {
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
-                        <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} /></td>
-                        <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} /></td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} alignUnit={tab === 'cash'} /></td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} alignUnit={tab === 'cash'} /></td>
                         <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                          <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed />
+                          <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed alignUnit={tab === 'cash'} />
                         </td>
                         <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
                           {formatPercent(combinedTotals.totalGainLossPct)}

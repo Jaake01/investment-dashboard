@@ -179,10 +179,11 @@ interface BubbleNode extends BubbleDatum {
   y: number;
 }
 
-// Compresses the size range so a small holding is still clearly visible next
-// to a large one (proportional, not to-scale) — a plain sqrt-of-value scale
-// would make the smallest slices disappear entirely.
-const SIZE_EXPONENT = 0.42;
+// 0.5 makes bubble *area* directly proportional to value (area = πr², and
+// r ∝ value^0.5 means area ∝ value) — the true reading of a bubble chart.
+// Anything lower visually flattens the differences between holdings, which
+// is what made very different-sized positions (e.g. 27% vs 3%) look similar.
+const SIZE_EXPONENT = 0.5;
 
 function layoutBubbles(data: BubbleDatum[], width: number, height: number): BubbleNode[] {
   if (data.length === 0 || width <= 0 || height <= 0) return [];
@@ -190,7 +191,7 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   // Radius bounds shrink a bit as the bubble count grows, so a long holdings
   // list still has a reasonable chance of fitting without heavy overlap.
-  const maxRadius = Math.max(28, Math.min(85, 360 / Math.sqrt(data.length)));
+  const maxRadius = Math.max(30, Math.min(105, 440 / Math.sqrt(data.length)));
   const minRadius = Math.max(19, maxRadius * 0.32);
 
   const classesPresent = ASSET_CLASSES.filter((c) => data.some((d) => d.assetClass === c));
@@ -200,8 +201,8 @@ function layoutBubbles(data: BubbleDatum[], width: number, height: number): Bubb
   // width instead of bunching into a small circle in the middle, while still
   // pulling clusters close enough together to read as one connected group
   // rather than isolated islands with empty space between them.
-  const spreadX = width * 0.2;
-  const spreadY = height * 0.2;
+  const spreadX = width * 0.26;
+  const spreadY = height * 0.3;
   const anchors: Partial<Record<AssetClass, { x: number; y: number }>> = {};
   classesPresent.forEach((c, i) => {
     const angle = (i / classesPresent.length) * Math.PI * 2 - Math.PI / 2;
@@ -427,7 +428,7 @@ interface TooltipState {
   top: number;
 }
 
-const CHART_HEIGHT = 480;
+const CHART_HEIGHT = 580;
 
 // recharts v3's ResponsiveContainer only measures/sizes actual recharts chart
 // components (via an internal context), not arbitrary children — so a

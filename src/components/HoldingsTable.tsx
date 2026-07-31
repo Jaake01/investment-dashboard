@@ -5,7 +5,7 @@ import { useFxRate } from '../hooks/useFxRate';
 import { computeClassTotals, computeHoldingMetrics, convertToTwd, currencyFor, type HoldingMetrics } from '../lib/calculations';
 import { formatAmount, formatShares, formatPercent, formatSignedNumber, googleNewsUrlFor } from '../lib/format';
 import { CASH_CURRENCY_ORDER, twdRateForCashCurrency } from '../lib/cashLedger';
-import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency } from '../types';
+import { ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type AssetClass, type Currency, type Holding, type PriceEntry } from '../types';
 import { HoldingFormModal } from './HoldingFormModal';
 
 // Currency label shown as its own left-aligned column next to a value (see
@@ -82,6 +82,92 @@ function compareRows(a: Row, b: Row, key: SortKey, dir: 'asc' | 'desc'): number 
   return dir === 'asc' ? cmp : -cmp;
 }
 
+interface TabData {
+  metrics: HoldingMetrics[];
+  sortedRows: Row[];
+  cashBalanceEntries: [string, number][];
+  cashBalanceRows: { currency: string; amount: number; twdValue: number | null }[];
+  combinedTotals: { totalCostValue: number; totalMarketValue: number; totalGainLoss: number; totalGainLossPct: number };
+  footerUnit: string;
+}
+
+// Pure per-tab data build-out, factored out of the component so every tab
+// can be computed (and rendered) at once — see .table-panels in index.css,
+// which stacks every tab's table in the same grid cell so the card's height
+// is always pinned to the tallest one, and switching tabs never resizes it.
+function buildTabData(
+  tab: AssetClass,
+  holdings: Holding[],
+  prices: Record<string, PriceEntry>,
+  cashBalances: Record<string, number>,
+  usdToTwd: number | null,
+  jpyToTwd: number | null,
+  sortKey: SortKey | null,
+  sortDir: 'asc' | 'desc',
+): TabData {
+  const metrics = holdings.filter((h) => h.assetClass === tab).map((h) => computeHoldingMetrics(h, prices));
+
+  const rows: Row[] = metrics.map((m) => {
+    const currency = currencyFor(m.holding);
+    const isForeignCash = m.holding.assetClass === 'cash' && currency !== 'TWD';
+    return {
+      m,
+      changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
+      isForeignCash,
+      displayCostValue: isForeignCash ? convertToTwd(m.costValue, currency, usdToTwd) : m.costValue,
+      displayMarketValue: isForeignCash ? convertToTwd(m.marketValue, currency, usdToTwd) : m.marketValue,
+      displayGainLoss: isForeignCash ? convertToTwd(m.gainLoss, currency, usdToTwd) : m.gainLoss,
+    };
+  });
+  const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
+  const totals = computeClassTotals(metrics, usdToTwd);
+
+  // The 現金帳戶 ledger (see CashLedgerCard) tracks raw currency balances
+  // separately from 現金-classified Holdings like STRC/0056 (real securities
+  // someone just groups under 現金) — shown here as extra, non-editable rows
+  // so the 現金 tab reflects true liquidity, not just invested-in-cash
+  // positions. Pinned at the top, ahead of the sortable rows, rather than
+  // folded into them, since there's no real Holding/id backing them (nothing
+  // to sort by price/edit/delete). A balance has no cost basis of its own, so it
+  // contributes equally to cost and market value (zero gain/loss) in the
+  // footer total below.
+  const cashBalanceEntries =
+    tab === 'cash'
+      ? Object.entries(cashBalances)
+          .filter(([, amount]) => amount !== 0)
+          .sort(([a], [b]) => {
+            const ai = CASH_CURRENCY_ORDER.indexOf(a);
+            const bi = CASH_CURRENCY_ORDER.indexOf(b);
+            if (ai === -1 && bi === -1) return a.localeCompare(b);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+          })
+      : [];
+  let cashBalanceTwdTotal = 0;
+  const cashBalanceRows = cashBalanceEntries.map(([currency, amount]) => {
+    const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    const twdValue = rate === null ? null : amount * rate;
+    if (twdValue !== null) cashBalanceTwdTotal += twdValue;
+    return { currency, amount, twdValue };
+  });
+  const combinedTotals = {
+    totalCostValue: totals.totalCostValue + cashBalanceTwdTotal,
+    totalMarketValue: totals.totalMarketValue + cashBalanceTwdTotal,
+    totalGainLoss: totals.totalGainLoss,
+    totalGainLossPct:
+      totals.totalCostValue + cashBalanceTwdTotal !== 0
+        ? (totals.totalGainLoss / (totals.totalCostValue + cashBalanceTwdTotal)) * 100
+        : 0,
+  };
+  // 現金 tab totals are normalized to TWD (see computeClassTotals); every
+  // other tab holds one native currency throughout, so the footer keeps
+  // that tab's own label instead of assuming TWD.
+  const footerUnit = MONEY_UNIT[tab === 'cash' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[tab]];
+
+  return { metrics, sortedRows, cashBalanceEntries, cashBalanceRows, combinedTotals, footerUnit };
+}
+
 const BASE_TABS: AssetClass[] = ['crypto', 'us_stock', 'tw_stock', 'cash'];
 
 // Fixed pixel widths (used with table-layout: fixed) so columns don't
@@ -129,68 +215,6 @@ export function HoldingsTable() {
   const hasOther = holdings.some((h) => h.assetClass === 'other');
   const tabs = hasOther ? [...BASE_TABS, 'other' as AssetClass] : BASE_TABS;
 
-  const metrics = holdings
-    .filter((h) => h.assetClass === selectedClass)
-    .map((h) => computeHoldingMetrics(h, prices));
-
-  const rows: Row[] = metrics.map((m) => {
-    const currency = currencyFor(m.holding);
-    const isForeignCash = m.holding.assetClass === 'cash' && currency !== 'TWD';
-    return {
-      m,
-      changePercent: m.holding.symbol ? prices[m.holding.symbol]?.changePercent : undefined,
-      isForeignCash,
-      displayCostValue: isForeignCash ? convertToTwd(m.costValue, currency, effectiveUsdToTwd) : m.costValue,
-      displayMarketValue: isForeignCash ? convertToTwd(m.marketValue, currency, effectiveUsdToTwd) : m.marketValue,
-      displayGainLoss: isForeignCash ? convertToTwd(m.gainLoss, currency, effectiveUsdToTwd) : m.gainLoss,
-    };
-  });
-  const sortedRows = sortKey ? [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir)) : rows;
-  const totals = computeClassTotals(metrics, effectiveUsdToTwd);
-
-  // The 現金帳戶 ledger (see CashLedgerCard) tracks raw currency balances
-  // separately from 現金-classified Holdings like STRC/0056 (real securities
-  // someone just groups under 現金) — shown here as extra, non-editable rows
-  // so the 現金 tab reflects true liquidity, not just invested-in-cash
-  // positions. Pinned at the top, ahead of the sortable rows, rather than
-  // folded into them, since there's no real Holding/id backing them (nothing
-  // to sort by price/edit/delete). A balance has no cost basis of its own, so it
-  // contributes equally to cost and market value (zero gain/loss) in the
-  // footer total below.
-  const cashBalanceEntries =
-    selectedClass === 'cash'
-      ? Object.entries(cashBalances)
-          .filter(([, amount]) => amount !== 0)
-          .sort(([a], [b]) => {
-            const ai = CASH_CURRENCY_ORDER.indexOf(a);
-            const bi = CASH_CURRENCY_ORDER.indexOf(b);
-            if (ai === -1 && bi === -1) return a.localeCompare(b);
-            if (ai === -1) return 1;
-            if (bi === -1) return -1;
-            return ai - bi;
-          })
-      : [];
-  let cashBalanceTwdTotal = 0;
-  const cashBalanceRows = cashBalanceEntries.map(([currency, amount]) => {
-    const rate = twdRateForCashCurrency(currency, effectiveUsdToTwd, effectiveJpyToTwd);
-    const twdValue = rate === null ? null : amount * rate;
-    if (twdValue !== null) cashBalanceTwdTotal += twdValue;
-    return { currency, amount, twdValue };
-  });
-  const combinedTotals = {
-    totalCostValue: totals.totalCostValue + cashBalanceTwdTotal,
-    totalMarketValue: totals.totalMarketValue + cashBalanceTwdTotal,
-    totalGainLoss: totals.totalGainLoss,
-    totalGainLossPct:
-      totals.totalCostValue + cashBalanceTwdTotal !== 0
-        ? (totals.totalGainLoss / (totals.totalCostValue + cashBalanceTwdTotal)) * 100
-        : 0,
-  };
-  // 現金 tab totals are normalized to TWD (see computeClassTotals); every
-  // other tab holds one native currency throughout, so the footer keeps
-  // that tab's own label instead of assuming TWD.
-  const footerUnit = MONEY_UNIT[selectedClass === 'cash' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[selectedClass]];
-
   return (
     <section className="card">
       <div className="card-header">
@@ -212,166 +236,189 @@ export function HoldingsTable() {
         ))}
       </div>
 
-      {holdings.length === 0 && cashBalanceEntries.length === 0 ? (
-        <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
-      ) : metrics.length === 0 && cashBalanceEntries.length === 0 ? (
-        <p className="empty-state">「{ASSET_CLASS_LABELS[selectedClass]}」目前沒有持股。</p>
-      ) : (
-        <div className="table-scroll">
-          <table className="holdings-table">
-            <colgroup>
-              {COLUMN_WIDTHS.map((width, i) => (
-                <col key={i} style={{ width }} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                {(
-                  [
-                    ['symbol', '代號'],
-                    ['price', '現價'],
-                    ['change', '漲跌'],
-                    ['shares', '數量'],
-                    ['avgCost', '平均成本'],
-                    ['costValue', '總成本'],
-                    ['marketValue', '市值'],
-                    ['gainLoss', '損益'],
-                    ['gainLossPct', '損益率'],
-                  ] as [SortKey, string][]
-                ).map(([key, label]) => (
-                  <th key={key}>
-                    <button className="sort-header" onClick={() => handleSort(key)}>
-                      {label}
-                      <span className="sort-arrow">
-                        {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-                      </span>
-                    </button>
-                  </th>
-                ))}
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {cashBalanceRows.map(({ currency, amount, twdValue }) => (
-                <tr key={`cash-balance-${currency}`} className="cash-balance-row">
-                  <td>{currency}</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td><Money unit={CASH_UNIT[currency] ?? currency} value={amount} /></td>
-                  <td>—</td>
-                  <td><Money unit="$" value={twdValue} /></td>
-                  <td><Money unit="$" value={twdValue} /></td>
-                  <td className="change-up"><Money unit="$" value={twdValue === null ? null : 0} signed /></td>
-                  <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
-                  <td></td>
-                </tr>
-              ))}
-              {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
-                const isGain = m.gainLoss >= 0;
-                const isMenuOpen = openMenu?.id === m.holding.id;
-                const nativeUnit = MONEY_UNIT[currencyFor(m.holding)];
-                // isForeignCash rows have already been converted to their TWD
-                // equivalent above (see the Row interface), so their 總成本/
-                // 市值/損益 columns get the TWD label instead of the native one.
-                const displayUnit = isForeignCash ? MONEY_UNIT.TWD : nativeUnit;
-                return (
-                  <tr key={m.holding.id}>
-                    <td>{m.holding.symbol || '—'}</td>
-                    <td><Money unit={nativeUnit} value={m.currentPrice} /></td>
-                    <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
-                      {changePercent === undefined ? '—' : formatPercent(changePercent)}
-                    </td>
-                    <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
-                    <td><Money unit={nativeUnit} value={m.holding.avgCost} /></td>
-                    <td><Money unit={displayUnit} value={displayCostValue} /></td>
-                    <td><Money unit={displayUnit} value={displayMarketValue} /></td>
-                    <td className={isGain ? 'change-up' : 'change-down'}><Money unit={displayUnit} value={displayGainLoss} signed /></td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
-                    <td className="row-actions">
-                      {m.holding.symbol && (
-                        <a
-                          className="news-link-icon"
-                          href={googleNewsUrlFor(m.holding.symbol)}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 7 天，依最新排序）`}
-                        >
-                          📰
-                        </a>
-                      )}
-                      <button
-                        className="btn btn-small btn-icon"
-                        aria-label="更多操作"
-                        onClick={(e) => {
-                          if (isMenuOpen) {
-                            setOpenMenu(null);
-                            return;
-                          }
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setOpenMenu({
-                            id: m.holding.id,
-                            top: rect.bottom + 4,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }}
-                      >
-                        ⋯
-                      </button>
-                      {isMenuOpen &&
-                        createPortal(
-                          <div
-                            className="row-menu-dropdown"
-                            ref={menuRef}
-                            style={{ position: 'fixed', top: openMenu.top, right: openMenu.right }}
-                          >
-                            <button
-                              onClick={() => {
-                                setEditingId(m.holding.id);
-                                setOpenMenu(null);
-                              }}
-                            >
-                              編輯
+      {/* Every tab's table is rendered at once and stacked in the same grid
+          cell (see .table-panels in index.css), so the card's height is
+          always the tallest tab's height — switching tabs never resizes the
+          card or shifts the page's scroll position. Only the active one is
+          visible/interactive. */}
+      <div className="table-panels">
+        {tabs.map((tab) => {
+          const { metrics, sortedRows, cashBalanceEntries, cashBalanceRows, combinedTotals, footerUnit } = buildTabData(
+            tab,
+            holdings,
+            prices,
+            cashBalances,
+            effectiveUsdToTwd,
+            effectiveJpyToTwd,
+            sortKey,
+            sortDir,
+          );
+          return (
+            <div key={tab} className={`table-panel ${tab === selectedClass ? 'active' : ''}`}>
+              {holdings.length === 0 && cashBalanceEntries.length === 0 ? (
+                <p className="empty-state">尚未新增任何持股，點擊「新增持股」開始，或到下方設定匯入 Google Sheet。</p>
+              ) : metrics.length === 0 && cashBalanceEntries.length === 0 ? (
+                <p className="empty-state">「{ASSET_CLASS_LABELS[tab]}」目前沒有持股。</p>
+              ) : (
+                <div className="table-scroll">
+                  <table className="holdings-table">
+                    <colgroup>
+                      {COLUMN_WIDTHS.map((width, i) => (
+                        <col key={i} style={{ width }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {(
+                          [
+                            ['symbol', '代號'],
+                            ['price', '現價'],
+                            ['change', '漲跌'],
+                            ['shares', '數量'],
+                            ['avgCost', '平均成本'],
+                            ['costValue', '總成本'],
+                            ['marketValue', '市值'],
+                            ['gainLoss', '損益'],
+                            ['gainLossPct', '損益率'],
+                          ] as [SortKey, string][]
+                        ).map(([key, label]) => (
+                          <th key={key}>
+                            <button className="sort-header" onClick={() => handleSort(key)}>
+                              {label}
+                              <span className="sort-arrow">
+                                {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                              </span>
                             </button>
-                            <button
-                              className="danger"
-                              onClick={() => {
-                                setOpenMenu(null);
-                                if (window.confirm(`確定要刪除「${m.holding.symbol || '這筆持股'}」嗎？`)) {
-                                  deleteHolding(m.holding.id);
-                                }
-                              }}
-                            >
-                              刪除
-                            </button>
-                          </div>,
-                          document.body,
-                        )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="holdings-total-row">
-                <td>{selectedClass === 'cash' ? '總計（台幣 TWD）' : '總計'}</td>
-                <td>—</td>
-                <td>—</td>
-                <td>—</td>
-                <td>—</td>
-                <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} /></td>
-                <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} /></td>
-                <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                  <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed />
-                </td>
-                <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                  {formatPercent(combinedTotals.totalGainLossPct)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+                          </th>
+                        ))}
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashBalanceRows.map(({ currency, amount, twdValue }) => (
+                        <tr key={`cash-balance-${currency}`} className="cash-balance-row">
+                          <td>{currency}</td>
+                          <td>—</td>
+                          <td>—</td>
+                          <td><Money unit={CASH_UNIT[currency] ?? currency} value={amount} /></td>
+                          <td>—</td>
+                          <td><Money unit="$" value={twdValue} /></td>
+                          <td><Money unit="$" value={twdValue} /></td>
+                          <td className="change-up"><Money unit="$" value={twdValue === null ? null : 0} signed /></td>
+                          <td className="change-up">{twdValue === null ? '—' : '0.0%'}</td>
+                          <td></td>
+                        </tr>
+                      ))}
+                      {sortedRows.map(({ m, changePercent, isForeignCash, displayCostValue, displayMarketValue, displayGainLoss }) => {
+                        const isGain = m.gainLoss >= 0;
+                        const isMenuOpen = openMenu?.id === m.holding.id;
+                        const nativeUnit = MONEY_UNIT[currencyFor(m.holding)];
+                        // isForeignCash rows have already been converted to their TWD
+                        // equivalent above (see the Row interface), so their 總成本/
+                        // 市值/損益 columns get the TWD label instead of the native one.
+                        const displayUnit = isForeignCash ? MONEY_UNIT.TWD : nativeUnit;
+                        return (
+                          <tr key={m.holding.id}>
+                            <td>{m.holding.symbol || '—'}</td>
+                            <td><Money unit={nativeUnit} value={m.currentPrice} /></td>
+                            <td className={changePercent === undefined ? '' : changePercent > 0 ? 'change-up' : changePercent < 0 ? 'change-down' : ''}>
+                              {changePercent === undefined ? '—' : formatPercent(changePercent)}
+                            </td>
+                            <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
+                            <td><Money unit={nativeUnit} value={m.holding.avgCost} /></td>
+                            <td><Money unit={displayUnit} value={displayCostValue} /></td>
+                            <td><Money unit={displayUnit} value={displayMarketValue} /></td>
+                            <td className={isGain ? 'change-up' : 'change-down'}><Money unit={displayUnit} value={displayGainLoss} signed /></td>
+                            <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
+                            <td className="row-actions">
+                              {m.holding.symbol && (
+                                <a
+                                  className="news-link-icon"
+                                  href={googleNewsUrlFor(m.holding.symbol)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={`在 Google 新聞搜尋「${m.holding.symbol}」（近 7 天，依最新排序）`}
+                                >
+                                  📰
+                                </a>
+                              )}
+                              <button
+                                className="btn btn-small btn-icon"
+                                aria-label="更多操作"
+                                onClick={(e) => {
+                                  if (isMenuOpen) {
+                                    setOpenMenu(null);
+                                    return;
+                                  }
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setOpenMenu({
+                                    id: m.holding.id,
+                                    top: rect.bottom + 4,
+                                    right: window.innerWidth - rect.right,
+                                  });
+                                }}
+                              >
+                                ⋯
+                              </button>
+                              {isMenuOpen &&
+                                createPortal(
+                                  <div
+                                    className="row-menu-dropdown"
+                                    ref={menuRef}
+                                    style={{ position: 'fixed', top: openMenu.top, right: openMenu.right }}
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        setEditingId(m.holding.id);
+                                        setOpenMenu(null);
+                                      }}
+                                    >
+                                      編輯
+                                    </button>
+                                    <button
+                                      className="danger"
+                                      onClick={() => {
+                                        setOpenMenu(null);
+                                        if (window.confirm(`確定要刪除「${m.holding.symbol || '這筆持股'}」嗎？`)) {
+                                          deleteHolding(m.holding.id);
+                                        }
+                                      }}
+                                    >
+                                      刪除
+                                    </button>
+                                  </div>,
+                                  document.body,
+                                )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="holdings-total-row">
+                        <td>{tab === 'cash' ? '總計（台幣 TWD）' : '總計'}</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} /></td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} /></td>
+                        <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                          <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed />
+                        </td>
+                        <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
+                          {formatPercent(combinedTotals.totalGainLossPct)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {(isAdding || editingId) && (
         <HoldingFormModal

@@ -360,6 +360,27 @@ th {
   font-variant-numeric: tabular-nums;
 }
 
+/* Every tab's table is rendered simultaneously, all stacked in this single
+   grid cell — grid track sizing takes the tallest item, so the card's
+   height is always pinned to the longest tab regardless of which one is
+   showing. Only the active panel is visible/interactive; the rest stay in
+   the layout (not display:none) purely so they keep contributing to that
+   height. */
+.table-panels {
+  display: grid;
+}
+
+.table-panel {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.table-panel.active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
 .row-actions {
   display: flex;
   gap: 6px;

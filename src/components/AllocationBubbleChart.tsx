@@ -97,10 +97,12 @@ function buildCashBalanceEntries(
   const entries: { key: string; name: string; value: number }[] = [];
   for (const currency of currencies) {
     const amount = cashBalances[currency];
-    // Single-class (現金) drill-down shows native amounts, matching how
-    // STRC/0056 already render unconverted in that view; the combined "全部"
-    // view converts to TWD like every other class does there.
-    const rate = selectedClass ? 1 : twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
+    // Unlike every other class, 現金 itself mixes currencies (TWD/USD/USDT/
+    // JPY balances side by side), so — same as the combined "全部" view —
+    // this always converts to TWD rather than comparing raw currency units
+    // directly (comparing raw JPY-yen counts against raw USDT-token counts
+    // would make bubble sizes meaningless).
+    const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
     const value = rate === null ? null : amount * rate;
     if (value === null || value <= 0) continue;
     entries.push({ key: `cash-balance-${currency}`, name: `${currency} 現金`, value });
@@ -121,10 +123,16 @@ function buildBubbleData(
     .filter((m) => m.marketValue > 0)
     .map((m) => ({
       m,
-      // Combined view mixes currencies, so it converts to TWD (falling back
-      // to the native value when no FX rate is available yet, same as
-      // computeAllocation). A single-class view is already one currency.
-      value: selectedClass ? m.marketValue : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
+      // Every single-class view except 現金 is already one currency and can
+      // use the native value as-is. 現金 can mix TWD cash with a
+      // USD-auto-detected holding like STRC (see currencyFor), so — like the
+      // combined "全部" view — it converts to TWD (falling back to the
+      // native value when no FX rate is available yet, same as
+      // computeAllocation).
+      value:
+        selectedClass && selectedClass !== 'cash'
+          ? m.marketValue
+          : (convertToTwd(m.marketValue, currencyFor(m.holding), usdToTwd) ?? m.marketValue),
     }));
   const cashEntries = buildCashBalanceEntries(selectedClass, cashBalances, usdToTwd, jpyToTwd);
   const total = entries.reduce((sum, e) => sum + e.value, 0) + cashEntries.reduce((sum, e) => sum + e.value, 0);
@@ -737,7 +745,7 @@ export function AllocationBubbleChart() {
         )}
       </div>
 
-      {!selectedClass && effectiveUsdToTwd === null && !isEmpty && (
+      {(!selectedClass || selectedClass === 'cash') && (effectiveUsdToTwd === null || effectiveJpyToTwd === null) && !isEmpty && (
         <p className="settings-hint">尚未取得匯率，比例可能不準確（不同幣別的市值目前直接相加）。</p>
       )}
     </section>

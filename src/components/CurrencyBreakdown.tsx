@@ -25,11 +25,16 @@ export function CurrencyBreakdown() {
 
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
   const buckets = computeCurrencyBuckets(metrics);
-  // "占總資產" needs to mean the whole portfolio, not just the three buckets
-  // shown here — so the denominator also folds in the 現金帳戶 ledger
-  // balances (TWD/USD/USDT/JPY), same as PortfolioSummary's own total.
+  // 總市值 here is holdings only (crypto/us_stock/tw_stock/現金-classified
+  // Holdings like STRC) — it deliberately excludes the 現金帳戶 ledger
+  // (TWD/USD/USDT/JPY raw balances), unlike PortfolioSummary's 總資產 up top,
+  // which is the comprehensive holdings+cash figure. Percentages below still
+  // use that bigger, comprehensive total as their denominator (see
+  // grandTotalTwd) — including this row's own percentage, which is why it's
+  // not simply 100%.
   const cashLedgerTwd = computeCashLedgerTwdTotal(cashBalances, effectiveUsdToTwd, effectiveJpyToTwd);
-  const totalTwd = addTwd(computeTotalInTwd(metrics, effectiveUsdToTwd), cashLedgerTwd);
+  const totalTwd = computeTotalInTwd(metrics, effectiveUsdToTwd);
+  const grandTotalTwd = addTwd(totalTwd, cashLedgerTwd);
 
   return (
     <section className="card">
@@ -38,7 +43,7 @@ export function CurrencyBreakdown() {
         {buckets.map((bucket) => {
           const bucketTwd = convertToTwd(bucket.nativeTotal, bucket.currency, effectiveUsdToTwd);
           const percentOfTotal =
-            totalTwd !== null && bucketTwd !== null && totalTwd > 0 ? (bucketTwd / totalTwd) * 100 : null;
+            grandTotalTwd !== null && bucketTwd !== null && grandTotalTwd > 0 ? (bucketTwd / grandTotalTwd) * 100 : null;
           return (
             <div className="summary-stat" key={bucket.assetClass}>
               <span className="summary-label">{bucket.label}（{CURRENCY_LABELS[bucket.currency]}）</span>
@@ -50,12 +55,11 @@ export function CurrencyBreakdown() {
           );
         })}
         <div className="summary-stat">
-          <span className="summary-label">總資產（台幣）</span>
+          <span className="summary-label">總市值（台幣）</span>
           <span className="summary-value">{totalTwd === null ? '請先取得匯率' : formatTwd(totalTwd)}</span>
-          {/* Always exactly 100% by definition — shown anyway so the other
-              buckets' percentages read as shares of this whole instead of
-              floating numbers with no visible reference point. */}
-          {totalTwd !== null && totalTwd > 0 && <span className="summary-sub">100.0%</span>}
+          {totalTwd !== null && grandTotalTwd !== null && grandTotalTwd > 0 && (
+            <span className="summary-sub">{((totalTwd / grandTotalTwd) * 100).toFixed(1)}%</span>
+          )}
         </div>
       </div>
       {effectiveUsdToTwd === null && (

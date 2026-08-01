@@ -43,7 +43,10 @@ export function PortfolioSummary() {
       <h2>投資組合總覽（換算台幣）</h2>
       <div className="summary-grid">
         <div className="summary-stat">
-          <span className="summary-label">總市值</span>
+          {/* "總資產" (not 總市值) because this includes 現金帳戶 ledger
+              balances on top of holdings — see CurrencyBreakdown's 總市值
+              row for the holdings-only figure this is built from. */}
+          <span className="summary-label">總資產</span>
           <span className="summary-value">{totalMarketValue === null ? placeholder : formatCurrencyIn(totalMarketValue, 'TWD')}</span>
         </div>
         <div className="summary-stat">

@@ -134,7 +134,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     },
 
     mergeHoldingsFromImport: (rows) => {
-      const next = [...holdings];
+      const importedSymbols = new Set(rows.map((row) => row.symbol));
+      // A fully-sold position (0 remaining shares) is correctly omitted from
+      // `rows` by aggregateHoldingsFromTransactions — without this, it would
+      // never get removed here, since the loop below only adds/updates
+      // symbols present in `rows`, and the position would linger forever
+      // after being sold. Manually-added holdings are never touched by an
+      // import sync, sold-out or not.
+      const stale = holdings.filter((h) => h.source === 'import' && !importedSymbols.has(h.symbol));
+      const staleIds = new Set(stale.map((h) => h.id));
+      const next = holdings.filter((h) => !staleIds.has(h.id));
       for (const row of rows) {
         const existingIndex = next.findIndex((h) => h.symbol === row.symbol);
         if (existingIndex >= 0) {
@@ -158,7 +167,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         }
       }
       setHoldings(next);
-      cloudSync.pushHoldingsReplace(next, []);
+      cloudSync.pushHoldingsReplace(next, stale.map((h) => h.id));
     },
 
     setSettings: (patch) => {

@@ -171,8 +171,9 @@ export function useCloudSync({ holdings, setHoldings, settings, setSettingsState
   };
 
   // Covers both replaceHoldingsFromImport (removedIds = every holding that
-  // existed before the import) and mergeHoldingsFromImport (removedIds = []
-  // — merge never removes).
+  // existed before the import) and mergeHoldingsFromImport (removedIds =
+  // previously-imported holdings whose symbol dropped out of this sync,
+  // e.g. a fully-sold position — usually empty, but not always).
   const pushHoldingsReplace = (next: Holding[], removedIds: string[]) => {
     if (!user) return;
     batchUpsertHoldings(user.uid, next).catch(reportError);

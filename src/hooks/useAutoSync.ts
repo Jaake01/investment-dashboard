@@ -12,7 +12,7 @@ let syncInterval: ReturnType<typeof setInterval> | null = null;
 let syncedSheetUrl: string | null = null;
 
 export function useAutoSync() {
-  const { settings, mergeHoldingsFromImport } = usePortfolio();
+  const { settings, mergeHoldingsFromImport, setTransactions } = usePortfolio();
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -21,8 +21,9 @@ export function useAutoSync() {
     setIsSyncing(true);
     setError('');
     try {
-      const rows = await fetchAndParseSheet(sheetUrl);
+      const { rows, transactions } = await fetchAndParseSheet(sheetUrl);
       mergeHoldingsFromImport(rows);
+      if (transactions) setTransactions(transactions);
       setLastSyncedAt(new Date().toISOString());
     } catch (err) {
       setError(err instanceof CsvImportError ? err.message : '自動同步失敗');

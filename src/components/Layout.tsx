@@ -5,6 +5,7 @@ import { CashLedgerCard } from './CashLedgerCard';
 import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
+import { RealizedGains } from './RealizedGains';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
@@ -12,7 +13,7 @@ import { useCashLedger } from '../hooks/useCashLedger';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { usePortfolio } from '../context/PortfolioContext';
 
-type Page = 'overview' | 'settings';
+type Page = 'overview' | 'realized' | 'settings';
 
 export function Layout() {
   const [page, setPage] = useState<Page>('overview');
@@ -53,6 +54,12 @@ export function Layout() {
             總覽
           </button>
           <button
+            className={`tab-button ${page === 'realized' ? 'active' : ''}`}
+            onClick={() => setPage('realized')}
+          >
+            已實現損益
+          </button>
+          <button
             className={`tab-button ${page === 'settings' ? 'active' : ''}`}
             onClick={() => setPage('settings')}
           >
@@ -61,7 +68,7 @@ export function Layout() {
         </nav>
       </header>
       <main className="app-main">
-        {page === 'overview' ? (
+        {page === 'overview' && (
           <>
             <PortfolioSummary />
             <CurrencyBreakdown />
@@ -70,9 +77,9 @@ export function Layout() {
             <TrendChart />
             <HoldingsTable />
           </>
-        ) : (
-          <SettingsPanel />
         )}
+        {page === 'realized' && <RealizedGains />}
+        {page === 'settings' && <SettingsPanel />}
       </main>
     </div>
   );

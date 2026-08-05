@@ -122,7 +122,28 @@ export interface Transaction {
   date: string;
   assetClass: AssetClass;
   symbol: string;
+  name?: string;
   action: TransactionAction;
   price: number;
   amount: number;
+}
+
+// One sell event's outcome, derived from a symbol's running weighted-average
+// cost at the moment it was sold (see processTransactions in transactions.ts).
+export interface RealizedGain {
+  id: string;
+  sellDate: string;
+  symbol: string;
+  name?: string;
+  assetClass: AssetClass;
+  currency: Currency;
+  avgBuyPrice: number;
+  sellPrice: number;
+  shares: number;
+  realizedPnl: number; // native currency (see `currency`)
+  returnPct: number;
+  // Days since this symbol's current holding period began (see
+  // processTransactions) — null only if the sell somehow has no matching
+  // open position, which shouldn't happen in practice.
+  holdingDays: number | null;
 }

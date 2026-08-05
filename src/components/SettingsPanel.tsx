@@ -23,7 +23,8 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 ];
 
 export function SettingsPanel() {
-  const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, syncStatus, syncError } = usePortfolio();
+  const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, setTransactions, syncStatus, syncError } =
+    usePortfolio();
   const { user, loading: authLoading, signInError, signInWithGoogle, signOutUser } = useAuth();
   const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
   const {
@@ -55,8 +56,9 @@ export function SettingsPanel() {
     setImportError('');
     setIsImporting(true);
     try {
-      const rows = await fetchAndParseSheet(settings.sheetUrl);
+      const { rows, transactions } = await fetchAndParseSheet(settings.sheetUrl);
       setPendingRows(rows);
+      if (transactions) setTransactions(transactions);
     } catch (err) {
       setImportError(err instanceof CsvImportError ? err.message : '匯入失敗，請確認網址是否正確');
     } finally {
@@ -120,7 +122,7 @@ export function SettingsPanel() {
         <h3>Google Sheet 匯入</h3>
         <p className="settings-hint">
           在 Google Sheet 使用「檔案 → 共用 → 發布到網路」，格式選擇 CSV，將產生的網址貼在下方。支援兩種格式，程式會自動判斷：
-          「持股快照」（symbol、shares、avgCost，assetClass 與 name 選填）或「交易紀錄」（交易日期、類別、代號、動作、成交價格、成交金額——有「動作」欄位就視為交易紀錄，自動換算股數與加權平均成本）。
+          「持股快照」（symbol、shares、avgCost，assetClass 與 name 選填）或「交易紀錄」（交易日期、類別、代號、動作、成交價格、成交金額，名稱選填——有「動作」欄位就視為交易紀錄，自動換算股數與加權平均成本，並可在「已實現損益」分頁看到每筆賣出的損益）。
         </p>
         <div className="settings-row">
           <input

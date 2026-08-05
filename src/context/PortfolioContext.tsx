@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot } from '../types';
+import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot, Transaction } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useCloudSync, type SyncStatus } from '../hooks/useCloudSync';
 import { storageKey } from '../lib/storage';
@@ -35,6 +35,7 @@ interface PortfolioContextValue {
   syncStatus: SyncStatus;
   syncError: string | null;
   cashBalances: Record<string, number>;
+  transactions: Transaction[];
   addHolding: (input: NewHoldingInput) => void;
   updateHolding: (id: string, patch: Partial<NewHoldingInput>) => void;
   deleteHolding: (id: string) => void;
@@ -50,6 +51,7 @@ interface PortfolioContextValue {
   ) => void;
   mergeRemoteSnapshots: (remote: Snapshot[]) => void;
   setFxRate: (rate: FxRate) => void;
+  setTransactions: (transactions: Transaction[]) => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null);
@@ -88,6 +90,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   // Local-only, like fxRate/prices — re-fetched from the cash ledger sheet on
   // load rather than synced to the cloud, since it's a cheap derived value.
   const [cashBalances, setCashBalancesState] = useLocalStorage<Record<string, number>>(storageKey('cashBalances'), {});
+  // Local-only, same as cashBalances — a full mirror of whatever the 交易紀錄
+  // sheet currently contains, re-fetched (and wholesale replaced) on every
+  // sync rather than synced to the cloud itself. Used to derive 已實現損益
+  // (see RealizedGains.tsx / processTransactions).
+  const [transactions, setTransactionsState] = useLocalStorage<Transaction[]>(storageKey('transactions'), []);
 
   const cloudSync = useCloudSync({ holdings, setHoldings, settings, setSettingsState, snapshots, setSnapshots });
 
@@ -98,6 +105,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     snapshots,
     fxRate,
     cashBalances,
+    transactions,
     syncStatus: cloudSync.syncStatus,
     syncError: cloudSync.syncError,
 
@@ -206,7 +214,27 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     setCashBalances: (balances) => {
       setCashBalancesState(balances);
     },
-  }), [holdings, settings, prices, snapshots, fxRate, cashBalances, cloudSync, setHoldings, setSettingsState, setPrices, setSnapshots, setFxRateState, setCashBalancesState]);
+
+    setTransactions: (next) => {
+      setTransactionsState(next);
+    },
+  }), [
+    holdings,
+    settings,
+    prices,
+    snapshots,
+    fxRate,
+    cashBalances,
+    transactions,
+    cloudSync,
+    setHoldings,
+    setSettingsState,
+    setPrices,
+    setSnapshots,
+    setFxRateState,
+    setCashBalancesState,
+    setTransactionsState,
+  ]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
 }

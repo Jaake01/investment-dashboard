@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import type { AssetClass, ImportedHoldingRow, Transaction, TransactionAction } from '../types';
 import { ASSET_CLASSES } from '../types';
-import { aggregateHoldingsFromTransactions } from './transactions';
+import { processTransactions } from './transactions';
 import { guessAssetClassFromSymbol } from './symbolClass';
 
 export class CsvImportError extends Error {}
@@ -101,6 +101,7 @@ export function parseTransactionsCsv(csvText: string): Transaction[] {
   const priceKey = ['price', '成交價格'].find((k) => k in rows[0]);
   const amountKey = ['amount', '成交金額'].find((k) => k in rows[0]);
   const assetClassKey = ['assetclass', 'class', 'type', '類別'].find((k) => k in rows[0]);
+  const nameKey = ['name', '名稱'].find((k) => k in rows[0]);
 
   if (!dateKey || !symbolKey || !actionKey || !priceKey || !amountKey) {
     throw new CsvImportError('交易紀錄 CSV 欄位不完整，需要包含：交易日期、代號、動作、成交價格、成交金額');
@@ -115,6 +116,7 @@ export function parseTransactionsCsv(csvText: string): Transaction[] {
       date: (row[dateKey] ?? '').trim(),
       assetClass: assetClassKey ? parseAssetClass(row[assetClassKey], symbol) : guessAssetClassFromSymbol(symbol),
       symbol,
+      name: nameKey ? row[nameKey]?.trim() || undefined : undefined,
       action: parseAction(row[actionKey], index),
       price: parseNumber(row[priceKey], '成交價格', index),
       amount: parseNumber(row[amountKey], '成交金額', index),
@@ -126,7 +128,14 @@ function isTransactionLedgerCsv(headerRow: Record<string, string>): boolean {
   return ['action', '動作'].some((k) => k in headerRow);
 }
 
-export async function fetchAndParseSheet(sheetUrl: string): Promise<ImportedHoldingRow[]> {
+export interface SheetImportResult {
+  rows: ImportedHoldingRow[];
+  // Only set when the sheet is a 交易紀錄 (transaction ledger) — a plain
+  // 持股快照 sheet has no per-trade history to derive 已實現損益 from.
+  transactions: Transaction[] | null;
+}
+
+export async function fetchAndParseSheet(sheetUrl: string): Promise<SheetImportResult> {
   if (!sheetUrl.trim()) {
     throw new CsvImportError('請先填入 Google Sheet 發布的 CSV 網址');
   }
@@ -155,7 +164,9 @@ export async function fetchAndParseSheet(sheetUrl: string): Promise<ImportedHold
   }
 
   if (isTransactionLedgerCsv(probe.data[0])) {
-    return aggregateHoldingsFromTransactions(parseTransactionsCsv(text));
+    const transactions = parseTransactionsCsv(text);
+    const { holdings } = processTransactions(transactions);
+    return { rows: holdings, transactions };
   }
-  return parseHoldingsCsv(text);
+  return { rows: parseHoldingsCsv(text), transactions: null };
 }

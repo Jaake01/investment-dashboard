@@ -1,0 +1,288 @@
+import { useMemo, useState } from 'react';
+import { usePortfolio } from '../context/PortfolioContext';
+import { useFxRate } from '../hooks/useFxRate';
+import { processTransactions } from '../lib/transactions';
+import { convertToTwd } from '../lib/calculations';
+import { formatAmount, formatCurrencyIn, formatPercent, formatShares } from '../lib/format';
+import { ASSET_CLASS_LABELS, type AssetClass, type Currency, type RealizedGain } from '../types';
+
+// formatCurrencyIn's TWD output is a bare "$", ambiguous next to a USD row's
+// "US$" right above/below it in the same column — same fix as
+// CurrencyBreakdown/HoldingsTable's "TW$" convention.
+function formatMoney(value: number, currency: Currency): string {
+  return currency === 'TWD' ? `TW$${formatAmount(value)}` : formatCurrencyIn(value, currency);
+}
+
+// Only the asset classes real trades can happen in — 'other' has no
+// dedicated filter button (falls under 全部 only), matching how thin that
+// category is used everywhere else in the app.
+const ASSET_CLASS_FILTERS: AssetClass[] = ['tw_stock', 'us_stock', 'crypto', 'cash'];
+
+type QuickRange = 'month' | 'year' | 'lastYear' | 'all';
+const QUICK_RANGE_LABELS: Record<QuickRange, string> = { month: '本月', year: '今年', lastYear: '去年', all: '全部' };
+
+function matchesQuickRange(sellDate: string, range: QuickRange, now: Date): boolean {
+  if (range === 'all') return true;
+  const d = new Date(sellDate);
+  if (Number.isNaN(d.getTime())) return false;
+  if (range === 'month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  if (range === 'year') return d.getFullYear() === now.getFullYear();
+  return d.getFullYear() === now.getFullYear() - 1; // lastYear
+}
+
+type CurrencyFilter = 'all' | 'TWD' | 'USD';
+
+// USDC is 1:1 USD everywhere else in this app (see CURRENCY_FOR_ASSET_CLASS/
+// convertToTwd) — the USD filter/bucket folds it in rather than treating
+// crypto as a third currency the user has to separately remember to include.
+function matchesCurrencyFilter(currency: Currency, filter: CurrencyFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'TWD') return currency === 'TWD';
+  return currency === 'USD' || currency === 'USDC';
+}
+
+type SortKey = 'sellDate' | 'symbol' | 'avgBuyPrice' | 'sellPrice' | 'shares' | 'realizedPnl' | 'returnPct' | 'holdingDays';
+
+function sortValue(g: RealizedGain, key: SortKey): number | string | undefined {
+  switch (key) {
+    case 'sellDate':
+      return g.sellDate;
+    case 'symbol':
+      return g.symbol;
+    case 'avgBuyPrice':
+      return g.avgBuyPrice;
+    case 'sellPrice':
+      return g.sellPrice;
+    case 'shares':
+      return g.shares;
+    case 'realizedPnl':
+      return g.realizedPnl;
+    case 'returnPct':
+      return g.returnPct;
+    case 'holdingDays':
+      return g.holdingDays ?? undefined;
+  }
+}
+
+function compareGains(a: RealizedGain, b: RealizedGain, key: SortKey, dir: 'asc' | 'desc'): number {
+  const av = sortValue(a, key);
+  const bv = sortValue(b, key);
+  if (av === undefined && bv === undefined) return 0;
+  if (av === undefined) return 1;
+  if (bv === undefined) return -1;
+  const cmp = typeof av === 'string' || typeof bv === 'string' ? String(av).localeCompare(String(bv), 'zh-Hant') : (av as number) - (bv as number);
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+// null (rate missing) propagates rather than silently showing a partial sum
+// — same all-or-nothing convention as computeTotalInTwd.
+function sumRealizedTwd(gains: RealizedGain[], usdToTwd: number | null): number | null {
+  let total = 0;
+  for (const g of gains) {
+    const twd = convertToTwd(g.realizedPnl, g.currency, usdToTwd);
+    if (twd === null) return null;
+    total += twd;
+  }
+  return total;
+}
+
+// 賣出日期／代號／名稱／買入均價／賣出均價／股數／已實現損益／報酬率／持有天數
+const COLUMN_WIDTHS = ['100px', '80px', '110px', '90px', '90px', '80px', '110px', '80px', '80px'];
+
+const SORT_HEADERS: [SortKey, string][] = [
+  ['sellDate', '賣出日期'],
+  ['symbol', '代號'],
+  ['avgBuyPrice', '買入均價'],
+  ['sellPrice', '賣出均價'],
+  ['shares', '股數'],
+  ['realizedPnl', '已實現損益'],
+  ['returnPct', '報酬率'],
+  ['holdingDays', '持有天數'],
+];
+
+export function RealizedGains() {
+  const { transactions } = usePortfolio();
+  const { effectiveUsdToTwd } = useFxRate();
+  const [quickRange, setQuickRange] = useState<QuickRange>('all');
+  const [assetClass, setAssetClass] = useState<AssetClass | null>(null);
+  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  // Recomputed whenever the synced transaction log changes — cheap enough
+  // (a handful of sells at most) not to need caching beyond useMemo.
+  const realizedGains = useMemo(() => processTransactions(transactions).realizedGains, [transactions]);
+
+  // Summary cards read the *entire* history regardless of the filters below,
+  // same layering as PortfolioSummary/CurrencyBreakdown sitting above
+  // HoldingsTable's own tab selection — filters only narrow the table.
+  const twdTotal = realizedGains.filter((g) => g.currency === 'TWD').reduce((sum, g) => sum + g.realizedPnl, 0);
+  const usdTotal = realizedGains
+    .filter((g) => g.currency === 'USD' || g.currency === 'USDC')
+    .reduce((sum, g) => sum + g.realizedPnl, 0);
+  const now = new Date();
+  const ytdGains = realizedGains.filter((g) => matchesQuickRange(g.sellDate, 'year', now));
+  const mtdGains = realizedGains.filter((g) => matchesQuickRange(g.sellDate, 'month', now));
+  const ytdTwd = sumRealizedTwd(ytdGains, effectiveUsdToTwd);
+  const mtdTwd = sumRealizedTwd(mtdGains, effectiveUsdToTwd);
+  const winCount = realizedGains.filter((g) => g.realizedPnl > 0).length;
+  const totalCount = realizedGains.length;
+  const winRate = totalCount > 0 ? (winCount / totalCount) * 100 : null;
+
+  const filtered = realizedGains.filter(
+    (g) =>
+      matchesQuickRange(g.sellDate, quickRange, now) &&
+      (assetClass === null || g.assetClass === assetClass) &&
+      matchesCurrencyFilter(g.currency, currencyFilter) &&
+      (search.trim() === '' ||
+        g.symbol.toLowerCase().includes(search.trim().toLowerCase()) ||
+        (g.name ?? '').toLowerCase().includes(search.trim().toLowerCase())),
+  );
+  const sortedGains = sortKey ? [...filtered].sort((a, b) => compareGains(a, b, sortKey, sortDir)) : filtered;
+
+  return (
+    <section className="card">
+      <h2>已實現損益</h2>
+
+      <div className="summary-grid">
+        <div className="summary-stat">
+          <span className="summary-label">總已實現損益（TWD）</span>
+          <span className={`summary-value ${twdTotal !== 0 ? (twdTotal > 0 ? 'change-up' : 'change-down') : ''}`}>
+            {formatMoney(twdTotal, 'TWD')}
+          </span>
+        </div>
+        <div className="summary-stat">
+          <span className="summary-label">總已實現損益（USD）</span>
+          <span className={`summary-value ${usdTotal !== 0 ? (usdTotal > 0 ? 'change-up' : 'change-down') : ''}`}>
+            {formatMoney(usdTotal, 'USD')}
+          </span>
+        </div>
+        <div className="summary-stat">
+          <span className="summary-label">本年度已實現（台幣）</span>
+          <span className={`summary-value ${ytdTwd !== null && ytdTwd !== 0 ? (ytdTwd > 0 ? 'change-up' : 'change-down') : ''}`}>
+            {ytdTwd === null ? '請先取得匯率' : formatMoney(ytdTwd, 'TWD')}
+          </span>
+        </div>
+        <div className="summary-stat">
+          <span className="summary-label">本月已實現（台幣）</span>
+          <span className={`summary-value ${mtdTwd !== null && mtdTwd !== 0 ? (mtdTwd > 0 ? 'change-up' : 'change-down') : ''}`}>
+            {mtdTwd === null ? '請先取得匯率' : formatMoney(mtdTwd, 'TWD')}
+          </span>
+        </div>
+        <div className="summary-stat">
+          <span className="summary-label">勝率</span>
+          <span className="summary-value">{winRate === null ? '—' : `${winRate.toFixed(1)}%`}</span>
+          {totalCount > 0 && <span className="summary-sub">{winCount} / {totalCount} 筆</span>}
+        </div>
+      </div>
+
+      {realizedGains.length > 0 && (
+        <>
+          <div className="tab-bar">
+            {(Object.keys(QUICK_RANGE_LABELS) as QuickRange[]).map((range) => (
+              <button
+                key={range}
+                className={`tab-button ${quickRange === range ? 'active' : ''}`}
+                onClick={() => setQuickRange(range)}
+              >
+                {QUICK_RANGE_LABELS[range]}
+              </button>
+            ))}
+          </div>
+          <div className="tab-bar">
+            <button className={`tab-button ${assetClass === null ? 'active' : ''}`} onClick={() => setAssetClass(null)}>
+              全部類別
+            </button>
+            {ASSET_CLASS_FILTERS.map((c) => (
+              <button key={c} className={`tab-button ${assetClass === c ? 'active' : ''}`} onClick={() => setAssetClass(c)}>
+                {ASSET_CLASS_LABELS[c]}
+              </button>
+            ))}
+          </div>
+          <div className="settings-row">
+            <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value as CurrencyFilter)}>
+              <option value="all">全部幣別</option>
+              <option value="TWD">TWD</option>
+              <option value="USD">USD</option>
+            </select>
+            <input
+              type="text"
+              placeholder="搜尋代號或名稱"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+
+      {transactions.length === 0 ? (
+        <p className="empty-state">
+          目前沒有交易紀錄可用，請到下方設定填入「交易紀錄」格式的 Google Sheet 網址（需要有「動作」欄位）。
+        </p>
+      ) : realizedGains.length === 0 ? (
+        <p className="empty-state">目前沒有已實現損益，尚未賣出任何持股。</p>
+      ) : sortedGains.length === 0 ? (
+        <p className="empty-state">沒有符合篩選條件的紀錄。</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="holdings-table">
+            <colgroup>
+              {COLUMN_WIDTHS.map((width, i) => (
+                <col key={i} style={{ width }} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                {SORT_HEADERS.slice(0, 2).map(([key, label]) => (
+                  <th key={key}>
+                    <button className="sort-header" onClick={() => handleSort(key)}>
+                      {label}
+                      <span className="sort-arrow">{sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+                    </button>
+                  </th>
+                ))}
+                <th>名稱</th>
+                {SORT_HEADERS.slice(2).map(([key, label]) => (
+                  <th key={key}>
+                    <button className="sort-header" onClick={() => handleSort(key)}>
+                      {label}
+                      <span className="sort-arrow">{sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedGains.map((g) => {
+                const isGain = g.realizedPnl >= 0;
+                return (
+                  <tr key={g.id}>
+                    <td>{g.sellDate}</td>
+                    <td>{g.symbol}</td>
+                    <td>{g.name ?? '—'}</td>
+                    <td>{formatMoney(g.avgBuyPrice, g.currency)}</td>
+                    <td>{formatMoney(g.sellPrice, g.currency)}</td>
+                    <td>{formatShares(g.shares, g.assetClass)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatMoney(g.realizedPnl, g.currency)}</td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(g.returnPct)}</td>
+                    <td>{g.holdingDays === null ? '—' : `${g.holdingDays} 天`}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}

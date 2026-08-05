@@ -5,7 +5,6 @@ import { CashLedgerCard } from './CashLedgerCard';
 import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
-import { TradingView } from './TradingView';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
@@ -13,7 +12,7 @@ import { useCashLedger } from '../hooks/useCashLedger';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
 import { usePortfolio } from '../context/PortfolioContext';
 
-type Page = 'overview' | 'tradingview' | 'settings';
+type Page = 'overview' | 'settings';
 
 export function Layout() {
   const [page, setPage] = useState<Page>('overview');
@@ -54,12 +53,6 @@ export function Layout() {
             總覽
           </button>
           <button
-            className={`tab-button ${page === 'tradingview' ? 'active' : ''}`}
-            onClick={() => setPage('tradingview')}
-          >
-            TradingView
-          </button>
-          <button
             className={`tab-button ${page === 'settings' ? 'active' : ''}`}
             onClick={() => setPage('settings')}
           >
@@ -68,7 +61,7 @@ export function Layout() {
         </nav>
       </header>
       <main className="app-main">
-        {page === 'overview' && (
+        {page === 'overview' ? (
           <>
             <PortfolioSummary />
             <CurrencyBreakdown />
@@ -77,9 +70,9 @@ export function Layout() {
             <TrendChart />
             <HoldingsTable />
           </>
+        ) : (
+          <SettingsPanel />
         )}
-        {page === 'tradingview' && <TradingView />}
-        {page === 'settings' && <SettingsPanel />}
       </main>
     </div>
   );

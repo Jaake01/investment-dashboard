@@ -169,20 +169,6 @@ h3 {
   gap: 12px;
 }
 
-.tradingview-widget-container {
-  width: 100%;
-}
-
-/* 加密貨幣新聞/美股新聞 side by side — TradingView's Top Stories widget only
-   takes one `market` per instance, so 即時新聞 is two of them rather than
-   one combined feed (see TradingView.tsx). Stacks to one column on a narrow
-   card, same breakpoint behavior as .summary-grid. */
-.tv-news-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-}
-
 .card-header h2 {
   margin-bottom: 0;
 }

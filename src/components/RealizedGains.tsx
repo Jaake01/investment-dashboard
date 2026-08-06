@@ -254,6 +254,7 @@ export function RealizedGains() {
             <input
               type="text"
               inputMode="numeric"
+              className="date-range-input"
               placeholder="起始日期 20260101"
               maxLength={8}
               value={rangeStart}
@@ -263,6 +264,7 @@ export function RealizedGains() {
             <input
               type="text"
               inputMode="numeric"
+              className="date-range-input"
               placeholder="結束日期 20261231"
               maxLength={8}
               value={rangeEnd}

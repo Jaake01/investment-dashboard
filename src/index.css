@@ -563,6 +563,15 @@ th {
   min-width: 160px;
 }
 
+/* An 8-digit date (YYYYMMDD) doesn't need the 160px+ that .settings-row
+   inputs default to for things like a Sheet URL — this keeps the 已實現損益
+   date-range row from stretching across the whole card. */
+.settings-row input.date-range-input {
+  flex: none;
+  width: 150px;
+  min-width: 0;
+}
+
 .checkbox-label {
   display: flex;
   align-items: center;

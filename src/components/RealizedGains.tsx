@@ -18,8 +18,8 @@ function formatMoney(value: number, currency: Currency): string {
 // category is used everywhere else in the app.
 const ASSET_CLASS_FILTERS: AssetClass[] = ['tw_stock', 'us_stock', 'crypto', 'cash'];
 
-type QuickRange = 'month' | 'year' | 'lastYear' | 'all';
-const QUICK_RANGE_LABELS: Record<QuickRange, string> = { month: '本月', year: '今年', lastYear: '去年', all: '全部' };
+type QuickRange = 'all' | 'month' | 'year' | 'lastYear';
+const QUICK_RANGE_LABELS: Record<QuickRange, string> = { all: '全部', month: '本月', year: '今年', lastYear: '去年' };
 
 function matchesQuickRange(sellDate: string, range: QuickRange, now: Date): boolean {
   if (range === 'all') return true;
@@ -30,18 +30,28 @@ function matchesQuickRange(sellDate: string, range: QuickRange, now: Date): bool
   return d.getFullYear() === now.getFullYear() - 1; // lastYear
 }
 
-type CurrencyFilter = 'all' | 'TWD' | 'USD';
-
-// USDC is 1:1 USD everywhere else in this app (see CURRENCY_FOR_ASSET_CLASS/
-// convertToTwd) — the USD filter/bucket folds it in rather than treating
-// crypto as a third currency the user has to separately remember to include.
-function matchesCurrencyFilter(currency: Currency, filter: CurrencyFilter): boolean {
-  if (filter === 'all') return true;
-  if (filter === 'TWD') return currency === 'TWD';
-  return currency === 'USD' || currency === 'USDC';
+// "20260806" -> "2026-08-06". Returns null for anything that isn't exactly
+// 8 digits or doesn't parse to a real date, so a still-being-typed value
+// just doesn't filter yet rather than throwing.
+function parseYyyymmdd(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!/^\d{8}$/.test(trimmed)) return null;
+  const iso = `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}`;
+  return Number.isNaN(Date.parse(iso)) ? null : iso;
 }
 
-type SortKey = 'sellDate' | 'symbol' | 'avgBuyPrice' | 'sellPrice' | 'shares' | 'realizedPnl' | 'returnPct' | 'holdingDays';
+// Combines with the quick-range buttons (AND, not instead-of) — an empty/
+// invalid start or end just doesn't restrict that side.
+function matchesCustomRange(sellDate: string, startIso: string | null, endIso: string | null): boolean {
+  if (startIso === null && endIso === null) return true;
+  const t = Date.parse(sellDate);
+  if (Number.isNaN(t)) return false;
+  if (startIso !== null && t < Date.parse(startIso)) return false;
+  if (endIso !== null && t > Date.parse(`${endIso}T23:59:59`)) return false;
+  return true;
+}
+
+type SortKey = 'sellDate' | 'symbol' | 'shares' | 'avgBuyPrice' | 'sellPrice' | 'realizedPnl' | 'returnPct' | 'holdingDays';
 
 function sortValue(g: RealizedGain, key: SortKey): number | string | undefined {
   switch (key) {
@@ -49,12 +59,12 @@ function sortValue(g: RealizedGain, key: SortKey): number | string | undefined {
       return g.sellDate;
     case 'symbol':
       return g.symbol;
+    case 'shares':
+      return g.shares;
     case 'avgBuyPrice':
       return g.avgBuyPrice;
     case 'sellPrice':
       return g.sellPrice;
-    case 'shares':
-      return g.shares;
     case 'realizedPnl':
       return g.realizedPnl;
     case 'returnPct':
@@ -86,15 +96,25 @@ function sumRealizedTwd(gains: RealizedGain[], usdToTwd: number | null): number 
   return total;
 }
 
-// 賣出日期／代號／名稱／買入均價／賣出均價／股數／已實現損益／報酬率／持有天數
-const COLUMN_WIDTHS = ['100px', '80px', '110px', '90px', '90px', '80px', '110px', '80px', '80px'];
+function sumCostBasisTwd(gains: RealizedGain[], usdToTwd: number | null): number | null {
+  let total = 0;
+  for (const g of gains) {
+    const twd = convertToTwd(g.avgBuyPrice * g.shares, g.currency, usdToTwd);
+    if (twd === null) return null;
+    total += twd;
+  }
+  return total;
+}
+
+// 賣出日期／代號／股數／買入均價／賣出均價／已實現損益／報酬率／持有天數
+const COLUMN_WIDTHS = ['100px', '80px', '80px', '90px', '90px', '110px', '80px', '80px'];
 
 const SORT_HEADERS: [SortKey, string][] = [
   ['sellDate', '賣出日期'],
   ['symbol', '代號'],
+  ['shares', '股數'],
   ['avgBuyPrice', '買入均價'],
   ['sellPrice', '賣出均價'],
-  ['shares', '股數'],
   ['realizedPnl', '已實現損益'],
   ['returnPct', '報酬率'],
   ['holdingDays', '持有天數'],
@@ -104,8 +124,9 @@ export function RealizedGains() {
   const { transactions } = usePortfolio();
   const { effectiveUsdToTwd } = useFxRate();
   const [quickRange, setQuickRange] = useState<QuickRange>('all');
+  const [rangeStart, setRangeStart] = useState('');
+  const [rangeEnd, setRangeEnd] = useState('');
   const [assetClass, setAssetClass] = useState<AssetClass | null>(null);
-  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -139,16 +160,26 @@ export function RealizedGains() {
   const totalCount = realizedGains.length;
   const winRate = totalCount > 0 ? (winCount / totalCount) * 100 : null;
 
+  const startIso = parseYyyymmdd(rangeStart);
+  const endIso = parseYyyymmdd(rangeEnd);
   const filtered = realizedGains.filter(
     (g) =>
       matchesQuickRange(g.sellDate, quickRange, now) &&
+      matchesCustomRange(g.sellDate, startIso, endIso) &&
       (assetClass === null || g.assetClass === assetClass) &&
-      matchesCurrencyFilter(g.currency, currencyFilter) &&
       (search.trim() === '' ||
         g.symbol.toLowerCase().includes(search.trim().toLowerCase()) ||
         (g.name ?? '').toLowerCase().includes(search.trim().toLowerCase())),
   );
   const sortedGains = sortKey ? [...filtered].sort((a, b) => compareGains(a, b, sortKey, sortDir)) : filtered;
+
+  // Footer total reflects whatever's currently filtered/sorted above it —
+  // always TWD-converted since the visible rows can mix currencies (unlike
+  // HoldingsTable's per-tab totals, which never mix).
+  const filteredPnlTwd = sumRealizedTwd(sortedGains, effectiveUsdToTwd);
+  const filteredCostTwd = sumCostBasisTwd(sortedGains, effectiveUsdToTwd);
+  const filteredReturnPct =
+    filteredPnlTwd !== null && filteredCostTwd !== null && filteredCostTwd !== 0 ? (filteredPnlTwd / filteredCostTwd) * 100 : null;
 
   return (
     <section className="card">
@@ -199,6 +230,25 @@ export function RealizedGains() {
               </button>
             ))}
           </div>
+          <div className="settings-row">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="起始日期 20260101"
+              maxLength={8}
+              value={rangeStart}
+              onChange={(e) => setRangeStart(e.target.value)}
+            />
+            <span>至</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="結束日期 20261231"
+              maxLength={8}
+              value={rangeEnd}
+              onChange={(e) => setRangeEnd(e.target.value)}
+            />
+          </div>
           <div className="tab-bar">
             <button className={`tab-button ${assetClass === null ? 'active' : ''}`} onClick={() => setAssetClass(null)}>
               全部類別
@@ -210,11 +260,6 @@ export function RealizedGains() {
             ))}
           </div>
           <div className="settings-row">
-            <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value as CurrencyFilter)}>
-              <option value="all">全部幣別</option>
-              <option value="TWD">TWD</option>
-              <option value="USD">USD</option>
-            </select>
             <input
               type="text"
               placeholder="搜尋代號或名稱"
@@ -243,16 +288,7 @@ export function RealizedGains() {
             </colgroup>
             <thead>
               <tr>
-                {SORT_HEADERS.slice(0, 2).map(([key, label]) => (
-                  <th key={key}>
-                    <button className="sort-header" onClick={() => handleSort(key)}>
-                      {label}
-                      <span className="sort-arrow">{sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
-                    </button>
-                  </th>
-                ))}
-                <th>名稱</th>
-                {SORT_HEADERS.slice(2).map(([key, label]) => (
+                {SORT_HEADERS.map(([key, label]) => (
                   <th key={key}>
                     <button className="sort-header" onClick={() => handleSort(key)}>
                       {label}
@@ -269,10 +305,9 @@ export function RealizedGains() {
                   <tr key={g.id}>
                     <td>{g.sellDate}</td>
                     <td>{g.symbol}</td>
-                    <td>{g.name ?? '—'}</td>
+                    <td>{formatShares(g.shares, g.assetClass)}</td>
                     <td>{formatMoney(g.avgBuyPrice, g.currency)}</td>
                     <td>{formatMoney(g.sellPrice, g.currency)}</td>
-                    <td>{formatShares(g.shares, g.assetClass)}</td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatMoney(g.realizedPnl, g.currency)}</td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(g.returnPct)}</td>
                     <td>{g.holdingDays === null ? '—' : `${g.holdingDays} 天`}</td>
@@ -280,6 +315,22 @@ export function RealizedGains() {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="holdings-total-row">
+                <td>總計</td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+                <td className={filteredPnlTwd !== null && filteredPnlTwd < 0 ? 'change-down' : 'change-up'}>
+                  {filteredPnlTwd === null ? '請先取得匯率' : formatMoney(filteredPnlTwd, 'TWD')}
+                </td>
+                <td className={filteredReturnPct !== null && filteredReturnPct < 0 ? 'change-down' : 'change-up'}>
+                  {filteredReturnPct === null ? '—' : formatPercent(filteredReturnPct)}
+                </td>
+                <td>—</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

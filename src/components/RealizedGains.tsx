@@ -13,6 +13,29 @@ function formatMoney(value: number, currency: Currency): string {
   return currency === 'TWD' ? `TW$${formatAmount(value)}` : formatCurrencyIn(value, currency);
 }
 
+// Every column in this table can mix TWD/US$/USDC rows (unlike HoldingsTable,
+// where only the 現金 tab ever mixes currencies) — a plain formatMoney()
+// string left the unit drifting left/right per row depending on the number's
+// digit count, same alignment problem HoldingsTable's `alignUnit` fixes.
+// USDC's "N U" has no separate prefix to pull out, so it just sits in the
+// number slot with an empty unit slot, still filling the fixed-width column.
+function MoneyCell({ value, currency }: { value: number; currency: Currency }) {
+  if (currency === 'USDC') {
+    return (
+      <span className="money-cell money-cell--aligned">
+        <span className="money-unit" />
+        <span className="money-num">{formatCurrencyIn(value, 'USDC')}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="money-cell money-cell--aligned">
+      <span className="money-unit">{currency === 'TWD' ? 'TW$' : 'US$'}</span>
+      <span className="money-num">{formatAmount(value)}</span>
+    </span>
+  );
+}
+
 // Only the asset classes real trades can happen in — 'other' has no
 // dedicated filter button (falls under 全部 only), matching how thin that
 // category is used everywhere else in the app.
@@ -328,9 +351,11 @@ export function RealizedGains() {
                     <td>{g.sellDate}</td>
                     <td>{g.symbol}</td>
                     <td>{formatShares(g.shares, g.assetClass)}</td>
-                    <td>{formatMoney(g.avgBuyPrice, g.currency)}</td>
-                    <td>{formatMoney(g.sellPrice, g.currency)}</td>
-                    <td className={isGain ? 'change-up' : 'change-down'}>{formatMoney(g.realizedPnl, g.currency)}</td>
+                    <td><MoneyCell value={g.avgBuyPrice} currency={g.currency} /></td>
+                    <td><MoneyCell value={g.sellPrice} currency={g.currency} /></td>
+                    <td className={isGain ? 'change-up' : 'change-down'}>
+                      <MoneyCell value={g.realizedPnl} currency={g.currency} />
+                    </td>
                     <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(g.returnPct)}</td>
                     <td>{g.holdingDays === null ? '—' : `${g.holdingDays} 天`}</td>
                   </tr>
@@ -345,7 +370,7 @@ export function RealizedGains() {
                 <td>—</td>
                 <td>—</td>
                 <td className={filteredPnlTwd !== null && filteredPnlTwd < 0 ? 'change-down' : 'change-up'}>
-                  {filteredPnlTwd === null ? '請先取得匯率' : formatMoney(filteredPnlTwd, 'TWD')}
+                  {filteredPnlTwd === null ? '請先取得匯率' : <MoneyCell value={filteredPnlTwd} currency="TWD" />}
                 </td>
                 <td className={filteredReturnPct !== null && filteredReturnPct < 0 ? 'change-down' : 'change-up'}>
                   {filteredReturnPct === null ? '—' : formatPercent(filteredReturnPct)}

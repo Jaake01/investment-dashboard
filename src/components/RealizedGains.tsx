@@ -140,6 +140,26 @@ export function RealizedGains() {
     }
   };
 
+  // Quick range and the custom date inputs are two different ways to say
+  // the same thing (a date filter) — letting both apply at once (an AND)
+  // silently narrowed results in a way that looked like a bug (e.g. 今年
+  // still selected while typing an unrelated custom range produced 0 rows
+  // for no visible reason). Picking one now clears the other, so exactly
+  // one date filter is ever in effect.
+  const handleQuickRange = (range: QuickRange) => {
+    setQuickRange(range);
+    setRangeStart('');
+    setRangeEnd('');
+  };
+  const handleRangeStartChange = (value: string) => {
+    setRangeStart(value);
+    setQuickRange('all');
+  };
+  const handleRangeEndChange = (value: string) => {
+    setRangeEnd(value);
+    setQuickRange('all');
+  };
+
   // Recomputed whenever the synced transaction log changes — cheap enough
   // (a handful of sells at most) not to need caching beyond useMemo.
   const realizedGains = useMemo(() => processTransactions(transactions).realizedGains, [transactions]);
@@ -224,7 +244,7 @@ export function RealizedGains() {
               <button
                 key={range}
                 className={`tab-button ${quickRange === range ? 'active' : ''}`}
-                onClick={() => setQuickRange(range)}
+                onClick={() => handleQuickRange(range)}
               >
                 {QUICK_RANGE_LABELS[range]}
               </button>
@@ -234,19 +254,21 @@ export function RealizedGains() {
             <input
               type="text"
               inputMode="numeric"
+              className="date-range-input"
               placeholder="起始日期 20260101"
               maxLength={8}
               value={rangeStart}
-              onChange={(e) => setRangeStart(e.target.value)}
+              onChange={(e) => handleRangeStartChange(e.target.value)}
             />
             <span>至</span>
             <input
               type="text"
               inputMode="numeric"
+              className="date-range-input"
               placeholder="結束日期 20261231"
               maxLength={8}
               value={rangeEnd}
-              onChange={(e) => setRangeEnd(e.target.value)}
+              onChange={(e) => handleRangeEndChange(e.target.value)}
             />
           </div>
           <div className="tab-bar">

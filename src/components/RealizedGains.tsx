@@ -315,6 +315,7 @@ export function RealizedGains() {
         </>
       )}
 
+      <div className="realized-gains-body">
       {transactions.length === 0 ? (
         <p className="empty-state">
           目前沒有交易紀錄可用，請到下方設定填入「交易紀錄」格式的 Google Sheet 網址（需要有「動作」欄位）。
@@ -381,6 +382,7 @@ export function RealizedGains() {
           </table>
         </div>
       )}
+      </div>
     </section>
   );
 }

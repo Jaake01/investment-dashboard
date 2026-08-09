@@ -54,6 +54,9 @@ export function CashLedgerCard() {
           尚未取得 {missingRateFor.join('、')} 匯率，現金總額（台幣）暫不計入這些幣別。
         </p>
       )}
+      <p className="settings-hint">
+        此總額只計算現金餘額，不包含持股清單「現金」分頁裡歸類為現金、但實際上是股票/ETF 的持股（例如 STRC、0056），所以兩邊數字不會一樣。
+      </p>
     </section>
   );
 }

@@ -448,6 +448,11 @@ export function HoldingsTable() {
                   </table>
                 </div>
               )}
+              {tab === 'cash' && metrics.length > 0 && (
+                <p className="settings-hint">
+                  此總計包含現金餘額，加上歸類為現金、但實際上是股票/ETF 的持股，所以會比上方「現金帳戶」卡片的現金總額還大。
+                </p>
+              )}
             </div>
           );
         })}

@@ -9,6 +9,7 @@ import { useFxRate } from './useFxRate';
 import { activeApiKeyFor, type PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
+const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 const REQUEST_DELAY_MS: Record<string, number> = {
   finnhub: 250,
   twelvedata: 8_000,
@@ -18,11 +19,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Module-scoped (not per-component) so it only auto-fetches once per page
-// load even though usePrices() is called from multiple places (Layout, for
-// the background behavior, and SettingsPanel, for the manual button) —
-// matches the pattern useFxRate/useRemoteSnapshots already use.
-let hasAutoFetchedOnMount = false;
+// Module-scoped (not per-component), same reasoning and shape as
+// useAutoSync's syncInterval/syncedSheetUrl — one refresh loop shared across
+// every mounted instance of usePrices (Layout, for the background behavior,
+// and SettingsPanel, for the manual button), re-arming itself on a fixed
+// interval instead of only ever firing once on mount. The previous version
+// fetched exactly once per page load and never again, so prices went stale
+// for the rest of the session no matter how long the page stayed open.
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
+let refreshingKey: string | null = null;
 
 export function usePrices() {
   const { holdings, settings, prices, cashBalances, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
@@ -131,13 +136,27 @@ export function usePrices() {
   };
 
   useEffect(() => {
-    if (hasAutoFetchedOnMount) return;
     const hasProvider = settings.priceProvider !== 'none' && activeApiKeyFor(settings).trim().length > 0;
     const hasTwSheet = settings.twQuoteSheetUrl.trim().length > 0;
-    if (!hasProvider && !hasTwSheet) return;
-    if (holdings.length === 0) return;
-    hasAutoFetchedOnMount = true;
+    const enabled = (hasProvider || hasTwSheet) && holdings.length > 0;
+    const key = enabled
+      ? `${settings.priceProvider}|${activeApiKeyFor(settings)}|${settings.twQuoteSheetUrl}|${holdings.length}`
+      : null;
+
+    if (!key) {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+        refreshingKey = null;
+      }
+      return;
+    }
+    if (refreshingKey === key) return; // another mounted instance already refreshes this configuration
+
+    refreshingKey = key;
+    if (refreshInterval) clearInterval(refreshInterval);
     refreshPrices();
+    refreshInterval = setInterval(refreshPrices, AUTO_REFRESH_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.twQuoteSheetUrl, holdings.length]);
 

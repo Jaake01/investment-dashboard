@@ -5,10 +5,16 @@ import { PriceFetchError } from '../lib/priceProviders/errors';
 import { activeApiKeyFor } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 5 * 60_000;
+const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 
-// Module-scoped (not per-component) so multiple components calling useFxRate()
-// on the same page load don't each fire their own redundant auto-fetch.
-let hasAutoFetchedOnMount = false;
+// Module-scoped (not per-component), same reasoning and shape as
+// useAutoSync's syncInterval/syncedSheetUrl — one refresh loop shared across
+// every mounted instance of useFxRate, re-arming itself on a fixed interval
+// instead of only ever firing once on mount. The previous version fetched
+// exactly once per page load and never again, so the rate went stale for the
+// rest of the session no matter how long the page stayed open.
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
+let refreshingKey: string | null = null;
 
 export function useFxRate() {
   const { settings, fxRate, setFxRate } = usePortfolio();
@@ -50,12 +56,22 @@ export function useFxRate() {
   };
 
   useEffect(() => {
-    if (hasAutoFetchedOnMount) return;
-    if (!canAutoFetch) return;
+    const key = canAutoFetch ? activeApiKeyFor(settings) : null;
+    if (!key) {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+        refreshingKey = null;
+      }
+      return;
+    }
+    if (refreshingKey === key) return; // another mounted instance already refreshes this key
+
+    refreshingKey = key;
+    if (refreshInterval) clearInterval(refreshInterval);
     const isStale = !fxRate || Date.now() - new Date(fxRate.updatedAt).getTime() > MIN_REFRESH_INTERVAL_MS;
-    if (!isStale) return;
-    hasAutoFetchedOnMount = true;
-    refreshFxRate();
+    if (isStale) refreshFxRate();
+    refreshInterval = setInterval(refreshFxRate, AUTO_REFRESH_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAutoFetch]);
 

@@ -53,7 +53,7 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
       return;
     }
     if (Number.isNaN(avgCostNum) || avgCostNum < 0) {
-      setError('平均成本必須是有效數字');
+      setError('平均價格必須是有效數字');
       return;
     }
     if (deductFromCash && !deductSourceId) {
@@ -106,7 +106,7 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
             />
           </label>
           <label>
-            平均成本（每股）
+            平均價格（每股）
             <input
               type="number"
               step="any"

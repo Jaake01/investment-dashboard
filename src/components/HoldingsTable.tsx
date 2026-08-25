@@ -215,8 +215,8 @@ export function HoldingsTable() {
   const [isAdding, setIsAdding] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
   const [selectedClass, setSelectedClass] = useState<AssetClass>('us_stock');
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = useState<SortKey | null>('costValue');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleSort = (key: SortKey) => {
@@ -302,7 +302,7 @@ export function HoldingsTable() {
                             ['price', '現價'],
                             ['change', '漲跌'],
                             ['shares', '數量'],
-                            ['avgCost', '平均成本'],
+                            ['avgCost', '平均價格'],
                             ['costValue', '總成本'],
                             ['marketValue', '市值'],
                             ['gainLoss', '損益'],

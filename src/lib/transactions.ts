@@ -6,6 +6,11 @@ function parseDateValue(date: string): number {
   return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
 }
 
+// Below this, a share count is treated as "fully sold" rather than a real
+// leftover position — repeated floating-point buy/sell arithmetic across a
+// long transaction history essentially never lands on exactly 0.
+const SHARES_EPSILON = 1e-6;
+
 function daysBetween(from: string, to: string): number | null {
   const t1 = Date.parse(from);
   const t2 = Date.parse(to);
@@ -72,7 +77,8 @@ export function processTransactions(transactions: Transaction[]): ProcessedTrans
           holdingDays: acc.openedAt ? daysBetween(acc.openedAt, tx.date) : null,
         });
       }
-      acc.shares = Math.max(0, acc.shares - txShares);
+      const remainingShares = acc.shares - txShares;
+      acc.shares = remainingShares <= SHARES_EPSILON ? 0 : remainingShares;
       if (acc.shares <= 0) acc.openedAt = null;
     }
     acc.assetClass = tx.assetClass;

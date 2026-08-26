@@ -5,7 +5,7 @@ import { PriceFetchError } from '../lib/priceProviders/errors';
 import { activeApiKeyFor } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 5 * 60_000;
-const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
+const AUTO_REFRESH_INTERVAL_MS = 30 * 60_000;
 
 // Module-scoped (not per-component), same reasoning and shape as
 // useAutoSync's syncInterval/syncedSheetUrl — one refresh loop shared across
@@ -15,6 +15,24 @@ const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 // rest of the session no matter how long the page stayed open.
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let refreshingKey: string | null = null;
+// See usePrices.ts's identical activeRefresh/visibilityListenerAttached —
+// same fix, same reasoning: a backgrounded tab still burns Twelve Data's
+// daily credit budget on a schedule nobody's watching.
+let activeRefresh: (() => void) | null = null;
+let visibilityListenerAttached = false;
+
+function handleFxRateVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+    return;
+  }
+  if (!activeRefresh) return;
+  activeRefresh();
+  if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
+}
 
 export function useFxRate() {
   const { settings, fxRate, setFxRate } = usePortfolio();
@@ -61,14 +79,28 @@ export function useFxRate() {
       if (refreshInterval) {
         clearInterval(refreshInterval);
         refreshInterval = null;
-        refreshingKey = null;
       }
+      refreshingKey = null;
+      activeRefresh = null;
       return;
     }
     if (refreshingKey === key) return; // another mounted instance already refreshes this key
 
     refreshingKey = key;
+    activeRefresh = refreshFxRate;
     if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = null;
+
+    if (!visibilityListenerAttached) {
+      document.addEventListener('visibilitychange', handleFxRateVisibilityChange);
+      visibilityListenerAttached = true;
+    }
+
+    // Tab is backgrounded right now — defer to handleFxRateVisibilityChange
+    // for both the immediate refresh and the interval, whenever it next
+    // becomes visible.
+    if (document.visibilityState === 'hidden') return;
+
     const isStale = !fxRate || Date.now() - new Date(fxRate.updatedAt).getTime() > MIN_REFRESH_INTERVAL_MS;
     if (isStale) refreshFxRate();
     refreshInterval = setInterval(refreshFxRate, AUTO_REFRESH_INTERVAL_MS);

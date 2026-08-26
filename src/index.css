@@ -310,6 +310,18 @@ th:nth-child(3) .sort-header {
   fill: var(--text);
 }
 
+.pie-leader-sub {
+  fill: var(--text-muted);
+}
+
+.pie-leader-sub.change-up {
+  fill: var(--loss);
+}
+
+.pie-leader-sub.change-down {
+  fill: var(--gain);
+}
+
 .pie-leader {
   cursor: default;
 }

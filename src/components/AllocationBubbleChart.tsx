@@ -566,7 +566,10 @@ const PIE_LABEL_FONT_SIZE = 13;
 const LEADER_ELBOW_GAP = 18;
 const LEADER_DOT_GAP = 8;
 const LEADER_TEXT_GAP = 8;
-const LEADER_MIN_GAP = 22;
+// Tall enough for two stacked label lines (name+percent, then 較昨日) without
+// adjacent leader labels crowding each other.
+const LEADER_MIN_GAP = 34;
+const PIE_SUB_LABEL_GAP = 15;
 const LEADER_DOT_RADIUS = 4;
 
 function polarPoint(cx: number, cy: number, r: number, angle: number) {
@@ -645,7 +648,10 @@ function PieChartSvg({ data, width, height }: { data: PieDatum[]; width: number;
   // short ones.
   const maxLabelTextWidth = Math.max(
     0,
-    ...data.map((d) => measureTextWidth(`${d.label} · ${d.percentLabel}`, labelFontSize, 400)),
+    ...data.flatMap((d) => [
+      measureTextWidth(`${d.label} · ${d.percentLabel}`, labelFontSize, 400),
+      d.changePct == null ? 0 : measureTextWidth(`較昨日 ${formatPercent(d.changePct)}`, labelFontSize - 1, 400),
+    ]),
   );
   const labelReserve = Math.max(
     MIN_LABEL_RESERVE,
@@ -733,6 +739,18 @@ function PieChartSvg({ data, width, height }: { data: PieDatum[]; width: number;
               >
                 {l.datum.label} · {l.datum.percentLabel}
               </text>
+              {l.datum.changePct != null && (
+                <text
+                  x={textX}
+                  y={finalY + PIE_SUB_LABEL_GAP}
+                  textAnchor={l.side === 1 ? 'start' : 'end'}
+                  dominantBaseline="central"
+                  fontSize={labelFontSize - 1}
+                  className={`pie-leader-sub ${l.datum.changePct > 0 ? 'change-up' : l.datum.changePct < 0 ? 'change-down' : ''}`}
+                >
+                  較昨日 {formatPercent(l.datum.changePct)}
+                </text>
+              )}
             </g>
           );
         })}

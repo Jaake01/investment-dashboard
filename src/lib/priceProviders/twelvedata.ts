@@ -10,6 +10,23 @@ interface TwelveDataQuoteResponse {
   message?: string;
 }
 
+// Twelve Data's free tier allows roughly 8 requests/minute — every caller
+// (usePrices' multi-symbol loop, useFxRate's USD/TWD + JPY/TWD pair, the
+// daily-snapshot script) used to pace itself independently, so two of them
+// auto-refreshing around the same moment could still add up to more than
+// 8 requests within a minute and get rate-limited. Funneling every request
+// through this shared, module-scoped clock means the spacing holds across
+// all callers, not just within any one of them.
+const TWELVEDATA_MIN_INTERVAL_MS = 8_000;
+let nextDispatchAt = 0;
+
+async function throttle(): Promise<void> {
+  const now = Date.now();
+  const waitMs = Math.max(0, nextDispatchAt - now);
+  nextDispatchAt = Math.max(now, nextDispatchAt) + TWELVEDATA_MIN_INTERVAL_MS;
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+}
+
 // There's no bare "BTC" instrument — crypto has to be queried as a trading
 // pair (same "BASE/QUOTE" convention this app already uses for the USD/TWD
 // FX rate). A bare symbol either 404s or, worse, silently matches an
@@ -22,6 +39,7 @@ function symbolForQuery(symbol: string, assetClass?: AssetClass): string {
 }
 
 export async function fetchTwelveDataQuote(symbol: string, apiKey: string, assetClass?: AssetClass): Promise<QuoteResult> {
+  await throttle();
   // Based on the symbol's own shape (numeric = TW-listed), not the holding's
   // assetClass — a TW high-dividend ETF tracked under 現金 instead of 台股
   // still needs the exchange hint to resolve correctly.

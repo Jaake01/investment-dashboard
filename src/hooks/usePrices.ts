@@ -10,9 +10,13 @@ import { activeApiKeyFor, type PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
 const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
+// Twelve Data paces itself internally now (see the shared throttle in
+// lib/priceProviders/twelvedata.ts, which also covers useFxRate's calls) —
+// pacing it again here on top of that would just double the wait for no
+// reason. Finnhub has no such shared throttle, so it still paces itself here.
 const REQUEST_DELAY_MS: Record<string, number> = {
   finnhub: 250,
-  twelvedata: 8_000,
+  twelvedata: 0,
 };
 
 function sleep(ms: number) {

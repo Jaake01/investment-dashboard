@@ -4,13 +4,18 @@ import { ASSET_CLASSES, ASSET_CLASS_LABELS, CURRENCY_FOR_ASSET_CLASS, type Asset
 import { guessAssetClassFromSymbol } from '../lib/symbolClass';
 import { currencyFor, currentPriceFor } from '../lib/calculations';
 
+// Below this, a share count is treated as "fully drained" rather than a real
+// leftover position — floating-point division/subtraction essentially never
+// lands on exactly 0.
+const SHARES_EPSILON = 1e-6;
+
 interface HoldingFormModalProps {
   editingId: string | null;
   onClose: () => void;
 }
 
 export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) {
-  const { holdings, prices, addHolding, updateHolding } = usePortfolio();
+  const { holdings, prices, addHolding, updateHolding, deleteHolding } = usePortfolio();
   const editingHolding = editingId ? holdings.find((h) => h.id === editingId) : undefined;
 
   const [symbol, setSymbol] = useState(editingHolding?.symbol ?? '');
@@ -79,7 +84,17 @@ export function HoldingFormModal({ editingId, onClose }: HoldingFormModalProps) 
           const purchaseCost = sharesNum * avgCostNum;
           const { price: sourcePrice } = currentPriceFor(source, prices);
           const deductShares = purchaseCost / sourcePrice;
-          updateHolding(source.id, { shares: source.shares - deductShares });
+          const remainingShares = source.shares - deductShares;
+          // Floating-point division/subtraction rarely lands on exactly 0 —
+          // without this, fully draining a cash-equivalent source leaves it
+          // sitting in the list forever with an invisible fractional share
+          // count (rounds to "0" in the 數量 column but still contributes a
+          // non-zero 市值), instead of actually disappearing.
+          if (remainingShares <= SHARES_EPSILON) {
+            deleteHolding(source.id);
+          } else {
+            updateHolding(source.id, { shares: remainingShares });
+          }
         }
       }
     }

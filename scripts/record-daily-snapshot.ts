@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fetchAndParseSheet } from '../src/lib/csv';
 import { fetchTwelveDataQuote } from '../src/lib/priceProviders/twelvedata';
-import { fetchQuoteSheet } from '../src/lib/quoteSheet';
+import { fetchQuoteSheet, type TwQuote } from '../src/lib/quoteSheet';
 import {
   computeClassValues,
   computeHoldingMetrics,
@@ -36,7 +36,7 @@ async function main() {
     process.exit(1);
   }
 
-  const rows = await fetchAndParseSheet(SHEET_URL);
+  const { rows } = await fetchAndParseSheet(SHEET_URL);
   const holdings: Holding[] = rows.map((row) => ({
     id: row.symbol,
     symbol: row.symbol,
@@ -53,7 +53,7 @@ async function main() {
   // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for
   // tw_stock holdings — Twelve Data's free tier doesn't reliably cover
   // TWSE. Mirrors the same fallback usePrices.ts uses in the browser.
-  let twQuotes: Record<string, number> = {};
+  let twQuotes: Record<string, TwQuote> = {};
   if (TW_QUOTE_SHEET_URL) {
     try {
       twQuotes = await fetchQuoteSheet(TW_QUOTE_SHEET_URL);
@@ -65,8 +65,9 @@ async function main() {
   const remainingSymbols: string[] = [];
   for (const symbol of symbols) {
     const holding = holdings.find((h) => h.symbol.trim() === symbol);
-    if (holding?.assetClass === 'tw_stock' && twQuotes[symbol] !== undefined) {
-      prices[symbol] = { symbol, price: twQuotes[symbol], updatedAt: new Date().toISOString() };
+    const quote = twQuotes[symbol];
+    if (holding?.assetClass === 'tw_stock' && quote !== undefined) {
+      prices[symbol] = { symbol, price: quote.price, changePercent: quote.changePercent, updatedAt: new Date().toISOString() };
     } else {
       remainingSymbols.push(symbol);
     }
@@ -76,8 +77,8 @@ async function main() {
     const symbol = remainingSymbols[i];
     const assetClass = holdings.find((h) => h.symbol.trim() === symbol)?.assetClass;
     try {
-      const price = await fetchTwelveDataQuote(symbol, API_KEY, assetClass);
-      prices[symbol] = { symbol, price, updatedAt: new Date().toISOString() };
+      const { price, changePercent } = await fetchTwelveDataQuote(symbol, API_KEY, assetClass);
+      prices[symbol] = { symbol, price, changePercent, updatedAt: new Date().toISOString() };
     } catch (err) {
       console.error(`quote failed for ${symbol}:`, err instanceof Error ? err.message : err);
     }
@@ -87,7 +88,7 @@ async function main() {
   let usdToTwd: number | null = null;
   try {
     if (remainingSymbols.length > 0) await sleep(QUOTE_DELAY_MS);
-    usdToTwd = await fetchTwelveDataQuote('USD/TWD', API_KEY);
+    usdToTwd = (await fetchTwelveDataQuote('USD/TWD', API_KEY)).price;
   } catch (err) {
     console.error('FX fetch failed:', err instanceof Error ? err.message : err);
   }

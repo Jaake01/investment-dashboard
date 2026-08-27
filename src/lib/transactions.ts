@@ -6,10 +6,30 @@ function parseDateValue(date: string): number {
   return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
 }
 
-// Below this, a share count is treated as "fully sold" rather than a real
-// leftover position — repeated floating-point buy/sell arithmetic across a
-// long transaction history essentially never lands on exactly 0.
-const SHARES_EPSILON = 1e-6;
+// A sell's implied share count (amount / price) is derived from two
+// independently-rounded dollar figures — Sheet cells are entered to the
+// cent, not the share — so it rarely matches a buy's implied count exactly,
+// even in exact arithmetic. A symbol bought and fully sold more than once
+// (buy, sell out, buy again, sell out again, ...) reuses the same
+// accumulator across every round trip, so each round trip's own leftover
+// stacks on top of the last one's. Fuzzing this across 2-10 round trips with
+// realistic cent-rounded amounts found residuals worth over $1 at the sell
+// price — nowhere near float-noise scale (that's fixable with a tiny
+// epsilon), and it scales with the security's price level, so a fixed
+// share-count cutoff can never be sized right for every symbol. Judging
+// "fully sold" by the residual's dollar value at the sell price instead
+// — comfortably above that observed worst case, comfortably below any
+// position a user would actually consider still holding — is robust
+// regardless of price level or how many round trips compounded into it.
+const DUST_VALUE_THRESHOLD = 2;
+// Rounding to a fixed precision after every update — far finer than any
+// real share count this app deals with, so it never masks a genuine
+// fractional position — also resets true float noise (as opposed to the
+// cent-rounding drift above) before it has a chance to compound.
+const SHARES_PRECISION = 1e8;
+function roundShares(value: number): number {
+  return Math.round(value * SHARES_PRECISION) / SHARES_PRECISION;
+}
 
 function daysBetween(from: string, to: string): number | null {
   const t1 = Date.parse(from);
@@ -54,7 +74,7 @@ export function processTransactions(transactions: Transaction[]): ProcessedTrans
 
     if (tx.action === 'buy') {
       if (acc.shares <= 0) acc.openedAt = tx.date;
-      const newShares = acc.shares + txShares;
+      const newShares = roundShares(acc.shares + txShares);
       acc.avgCost = newShares > 0 ? (acc.shares * acc.avgCost + txShares * tx.price) / newShares : 0;
       acc.shares = newShares;
     } else {
@@ -77,8 +97,9 @@ export function processTransactions(transactions: Transaction[]): ProcessedTrans
           holdingDays: acc.openedAt ? daysBetween(acc.openedAt, tx.date) : null,
         });
       }
-      const remainingShares = acc.shares - txShares;
-      acc.shares = remainingShares <= SHARES_EPSILON ? 0 : remainingShares;
+      const remainingShares = roundShares(acc.shares - txShares);
+      const remainingValue = Math.abs(remainingShares) * tx.price;
+      acc.shares = remainingValue <= DUST_VALUE_THRESHOLD ? 0 : remainingShares;
       if (acc.shares <= 0) acc.openedAt = null;
     }
     acc.assetClass = tx.assetClass;

@@ -21,7 +21,17 @@ function parseDateValue(date: string): number {
 // — comfortably above that observed worst case, comfortably below any
 // position a user would actually consider still holding — is robust
 // regardless of price level or how many round trips compounded into it.
-const DUST_VALUE_THRESHOLD = 2;
+//
+// The threshold itself is a USD figure, converted to whichever currency the
+// sell's own assetClass trades in (see CURRENCY_FOR_ASSET_CLASS) so it means
+// the same real amount everywhere — 2 TWD would be a meaningless ~$0.06 and
+// never catch anything. This is a fuzzy "is this basically zero" safety
+// margin, not a real financial figure, so a fixed approximate rate is
+// precise enough here; pulling in the live FX rate would mean threading it
+// through every processTransactions call site (Sheet auto-sync, manual
+// import, RealizedGains, the daily-snapshot script) for no real benefit.
+const DUST_VALUE_THRESHOLD_USD = 5;
+const APPROX_USD_TO_TWD = 32;
 // Rounding to a fixed precision after every update — far finer than any
 // real share count this app deals with, so it never masks a genuine
 // fractional position — also resets true float noise (as opposed to the
@@ -99,7 +109,9 @@ export function processTransactions(transactions: Transaction[]): ProcessedTrans
       }
       const remainingShares = roundShares(acc.shares - txShares);
       const remainingValue = Math.abs(remainingShares) * tx.price;
-      acc.shares = remainingValue <= DUST_VALUE_THRESHOLD ? 0 : remainingShares;
+      const dustThreshold =
+        CURRENCY_FOR_ASSET_CLASS[tx.assetClass] === 'TWD' ? DUST_VALUE_THRESHOLD_USD * APPROX_USD_TO_TWD : DUST_VALUE_THRESHOLD_USD;
+      acc.shares = remainingValue <= dustThreshold ? 0 : remainingShares;
       if (acc.shares <= 0) acc.openedAt = null;
     }
     acc.assetClass = tx.assetClass;

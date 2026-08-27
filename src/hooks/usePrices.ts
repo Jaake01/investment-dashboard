@@ -9,10 +9,14 @@ import { useFxRate } from './useFxRate';
 import { activeApiKeyFor, type PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
-const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
+const AUTO_REFRESH_INTERVAL_MS = 30 * 60_000;
+// Twelve Data paces itself internally now (see the shared throttle in
+// lib/priceProviders/twelvedata.ts, which also covers useFxRate's calls) —
+// pacing it again here on top of that would just double the wait for no
+// reason. Finnhub has no such shared throttle, so it still paces itself here.
 const REQUEST_DELAY_MS: Record<string, number> = {
   finnhub: 250,
-  twelvedata: 8_000,
+  twelvedata: 0,
 };
 
 function sleep(ms: number) {
@@ -28,6 +32,30 @@ function sleep(ms: number) {
 // for the rest of the session no matter how long the page stayed open.
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let refreshingKey: string | null = null;
+// The interval callback currently in effect, kept module-scoped alongside
+// refreshInterval/refreshingKey so the visibilitychange listener below (also
+// module-scoped, attached once) can call/restart the *current* owning
+// instance's refreshPrices closure without every instance needing its own
+// listener.
+let activeRefresh: (() => void) | null = null;
+let visibilityListenerAttached = false;
+
+// A backgrounded tab still burns through Twelve Data's daily credit budget
+// on a schedule nobody's watching — pausing here while hidden, then catching
+// up immediately on refocus, was the fix once we found real usage blowing
+// through the free tier's 800/day limit well before the day was over.
+function handlePricesVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+    return;
+  }
+  if (!activeRefresh) return;
+  activeRefresh();
+  if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
+}
 
 export function usePrices() {
   const { holdings, settings, prices, cashBalances, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
@@ -147,14 +175,28 @@ export function usePrices() {
       if (refreshInterval) {
         clearInterval(refreshInterval);
         refreshInterval = null;
-        refreshingKey = null;
       }
+      refreshingKey = null;
+      activeRefresh = null;
       return;
     }
     if (refreshingKey === key) return; // another mounted instance already refreshes this configuration
 
     refreshingKey = key;
+    activeRefresh = refreshPrices;
     if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = null;
+
+    if (!visibilityListenerAttached) {
+      document.addEventListener('visibilitychange', handlePricesVisibilityChange);
+      visibilityListenerAttached = true;
+    }
+
+    // Tab is backgrounded right now — defer both the immediate refresh and
+    // the interval to handlePricesVisibilityChange, whenever it next becomes
+    // visible, instead of spending credits on a tab nobody's watching.
+    if (document.visibilityState === 'hidden') return;
+
     refreshPrices();
     refreshInterval = setInterval(refreshPrices, AUTO_REFRESH_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps

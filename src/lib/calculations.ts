@@ -128,12 +128,34 @@ export function computeClassValues(metrics: HoldingMetrics[]): Partial<Record<As
   return map;
 }
 
+// Same grouping as computeClassValues, but cost basis instead of market
+// value — the other half of a snapshot's gain% (see computeGainPct).
+export function computeClassCostValues(metrics: HoldingMetrics[]): Partial<Record<AssetClass, number>> {
+  const map: Partial<Record<AssetClass, number>> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0) continue;
+    map[m.holding.assetClass] = (map[m.holding.assetClass] ?? 0) + m.costValue;
+  }
+  return map;
+}
+
 // Native-currency totals per holding symbol, for recording into a snapshot.
 export function computeSymbolValues(metrics: HoldingMetrics[]): Record<string, number> {
   const map: Record<string, number> = {};
   for (const m of metrics) {
     if (m.marketValue <= 0 || !m.holding.symbol) continue;
     map[m.holding.symbol] = (map[m.holding.symbol] ?? 0) + m.marketValue;
+  }
+  return map;
+}
+
+// Same grouping as computeSymbolValues, but cost basis instead of market
+// value — the other half of a snapshot's gain% (see computeGainPct).
+export function computeSymbolCostValues(metrics: HoldingMetrics[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const m of metrics) {
+    if (m.marketValue <= 0 || !m.holding.symbol) continue;
+    map[m.holding.symbol] = (map[m.holding.symbol] ?? 0) + m.costValue;
   }
   return map;
 }
@@ -149,6 +171,17 @@ export function computePreviousClassValue(
   return past.length > 0 ? past[0].classValues![assetClass]! : null;
 }
 
+export function computePreviousClassCostValue(
+  snapshots: Snapshot[],
+  assetClass: AssetClass,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.classCostValues?.[assetClass] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].classCostValues![assetClass]! : null;
+}
+
 export function computePreviousSymbolValue(
   snapshots: Snapshot[],
   symbol: string,
@@ -160,10 +193,50 @@ export function computePreviousSymbolValue(
   return past.length > 0 ? past[0].symbolValues![symbol]! : null;
 }
 
-// null if there's no previous value to compare against, or it was zero.
-export function computeDayChangePct(currentValue: number, previousValue: number | null): number | null {
-  if (previousValue === null || previousValue === 0) return null;
-  return ((currentValue - previousValue) / previousValue) * 100;
+export function computePreviousSymbolCostValue(
+  snapshots: Snapshot[],
+  symbol: string,
+  today: string = todayDateString(),
+): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.symbolCostValues?.[symbol] !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].symbolCostValues![symbol]! : null;
+}
+
+// Most recent recorded snapshot strictly before today with cost data —
+// counterpart to computePreviousSnapshotValue, for the whole-portfolio 較昨日.
+export function computePreviousSnapshotCost(snapshots: Snapshot[], today: string = todayDateString()): number | null {
+  const past = snapshots
+    .filter((s) => s.date < today && s.totalCost !== undefined)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return past.length > 0 ? past[0].totalCost! : null;
+}
+
+// Unrealized gain/loss as a percent of cost — null if there's no cost basis
+// to divide by (not yet recorded, or a zero-cost position).
+export function computeGainPct(value: number, cost: number | null | undefined): number | null {
+  if (cost === null || cost === undefined || cost === 0) return null;
+  return ((value - cost) / cost) * 100;
+}
+
+// "較昨日" as a change in unrealized gain% (percentage points), not raw
+// value% — comparing gain% to gain% cancels out the effect of adding or
+// removing money mid-period, unlike comparing value to value directly. A
+// same-day purchase moves value and cost together, barely nudging gain%
+// (only by however profitable that one purchase already was), whereas a
+// pure value comparison would misread "you added money" as "the price
+// moved." Null if either day is missing a value or a cost to divide by.
+export function computeDayChangeInGainPct(
+  todayValue: number,
+  todayCost: number | null | undefined,
+  previousValue: number | null,
+  previousCost: number | null,
+): number | null {
+  const todayGainPct = computeGainPct(todayValue, todayCost);
+  const previousGainPct = previousValue === null ? null : computeGainPct(previousValue, previousCost);
+  if (todayGainPct === null || previousGainPct === null) return null;
+  return todayGainPct - previousGainPct;
 }
 
 // Merges the daily-automated history (fetched from the "data" branch, see
@@ -189,6 +262,7 @@ export interface CurrencyBucket {
   label: string;
   currency: Currency;
   nativeTotal: number;
+  nativeCost: number;
 }
 
 const CURRENCY_BUCKET_CLASS_SET = new Set<AssetClass>(['us_stock', 'tw_stock', 'crypto']);
@@ -197,14 +271,16 @@ const CURRENCY_BUCKET_CLASSES = ASSET_CLASSES.filter((c) => CURRENCY_BUCKET_CLAS
 >;
 
 export function computeCurrencyBuckets(metrics: HoldingMetrics[]): CurrencyBucket[] {
-  return CURRENCY_BUCKET_CLASSES.map((assetClass) => ({
-    assetClass,
-    label: ASSET_CLASS_LABELS[assetClass],
-    currency: CURRENCY_FOR_ASSET_CLASS[assetClass],
-    nativeTotal: metrics
-      .filter((m) => m.holding.assetClass === assetClass)
-      .reduce((sum, m) => sum + m.marketValue, 0),
-  }));
+  return CURRENCY_BUCKET_CLASSES.map((assetClass) => {
+    const inClass = metrics.filter((m) => m.holding.assetClass === assetClass);
+    return {
+      assetClass,
+      label: ASSET_CLASS_LABELS[assetClass],
+      currency: CURRENCY_FOR_ASSET_CLASS[assetClass],
+      nativeTotal: inClass.reduce((sum, m) => sum + m.marketValue, 0),
+      nativeCost: inClass.reduce((sum, m) => sum + m.costValue, 0),
+    };
+  });
 }
 
 export function computeTotalInTwd(metrics: HoldingMetrics[], usdToTwd: number | null): number | null {

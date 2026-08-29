@@ -1,6 +1,13 @@
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
-import { computeHoldingMetrics, computePreviousSnapshotValue, computeTotalCostInTwd, computeTotalInTwd } from '../lib/calculations';
+import {
+  computeDayChangeInGainPct,
+  computeHoldingMetrics,
+  computePreviousSnapshotCost,
+  computePreviousSnapshotValue,
+  computeTotalCostInTwd,
+  computeTotalInTwd,
+} from '../lib/calculations';
 import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { formatCurrencyIn, formatPercent } from '../lib/format';
 
@@ -30,11 +37,13 @@ export function PortfolioSummary() {
   const isGain = (totalGainLoss ?? 0) >= 0;
   const placeholder = '請先取得匯率';
 
+  // 較昨日 as a change in gain% (today's unrealized return vs yesterday's),
+  // not raw value% — so buying/selling mid-day doesn't get misread as price
+  // movement. See computeDayChangeInGainPct.
   const previousValue = computePreviousSnapshotValue(snapshots);
+  const previousCostValue = computePreviousSnapshotCost(snapshots);
   const dayChangePct =
-    totalMarketValue !== null && previousValue !== null && previousValue !== 0
-      ? ((totalMarketValue - previousValue) / previousValue) * 100
-      : null;
+    totalMarketValue === null ? null : computeDayChangeInGainPct(totalMarketValue, totalCostValue, previousValue, previousCostValue);
   // Taiwan market convention: up is red, down is green; unchanged uses the default text color.
   const dayChangeClass = dayChangePct === null || dayChangePct === 0 ? '' : dayChangePct > 0 ? 'change-up' : 'change-down';
 

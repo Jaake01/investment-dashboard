@@ -9,9 +9,12 @@ import { fetchAndParseSheet } from '../src/lib/csv';
 import { fetchTwelveDataQuote } from '../src/lib/priceProviders/twelvedata';
 import { fetchQuoteSheet, type TwQuote } from '../src/lib/quoteSheet';
 import {
+  computeClassCostValues,
   computeClassValues,
   computeHoldingMetrics,
+  computeSymbolCostValues,
   computeSymbolValues,
+  computeTotalCostInTwd,
   computeTotalInTwd,
   todayDateString,
 } from '../src/lib/calculations';
@@ -100,8 +103,21 @@ async function main() {
     process.exit(1);
   }
 
+  // Unlike the browser's usePrices.ts, this script has no access to the
+  // 現金帳戶 cash ledger (a separate Sheet the browser reads on its own) —
+  // totalTwd/classValues here are holdings-only, same pre-existing gap as
+  // before cost tracking was added.
+  const totalCostTwd = computeTotalCostInTwd(metrics, usdToTwd);
+
   const existing: Snapshot[] = existsSync(OUTPUT_PATH) ? JSON.parse(readFileSync(OUTPUT_PATH, 'utf-8')) : [];
-  const next = recordSnapshot(existing, totalTwd, computeClassValues(metrics), computeSymbolValues(metrics));
+  const next = recordSnapshot(existing, {
+    totalValue: totalTwd,
+    totalCost: totalCostTwd ?? undefined,
+    classValues: computeClassValues(metrics),
+    classCostValues: computeClassCostValues(metrics),
+    symbolValues: computeSymbolValues(metrics),
+    symbolCostValues: computeSymbolCostValues(metrics),
+  });
   writeFileSync(OUTPUT_PATH, `${JSON.stringify(next, null, 2)}\n`);
   console.log(`Recorded snapshot for ${todayDateString()}: ${totalTwd.toFixed(0)} TWD (${symbols.length} symbols)`);
 }

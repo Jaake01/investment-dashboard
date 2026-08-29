@@ -1,10 +1,10 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { AssetClass, FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot, Transaction } from '../types';
+import type { FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot, Transaction } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useCloudSync, type SyncStatus } from '../hooks/useCloudSync';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
-import { recordSnapshot } from '../hooks/useSnapshots';
+import { recordSnapshot, type SnapshotInput } from '../hooks/useSnapshots';
 import { mergeSnapshots, todayDateString } from '../lib/calculations';
 import { DEFAULT_SHEET_URL } from '../lib/config';
 
@@ -44,11 +44,7 @@ interface PortfolioContextValue {
   setSettings: (patch: Partial<Settings>) => void;
   applyPriceUpdates: (entries: PriceEntry[]) => void;
   setCashBalances: (balances: Record<string, number>) => void;
-  recordCurrentSnapshot: (
-    totalValue: number,
-    classValues: Partial<Record<AssetClass, number>>,
-    symbolValues: Record<string, number>,
-  ) => void;
+  recordCurrentSnapshot: (input: SnapshotInput) => void;
   mergeRemoteSnapshots: (remote: Snapshot[]) => void;
   setFxRate: (rate: FxRate) => void;
   setTransactions: (transactions: Transaction[]) => void;
@@ -194,9 +190,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       });
     },
 
-    recordCurrentSnapshot: (totalValue, classValues, symbolValues) => {
-      setSnapshots(recordSnapshot(snapshots, totalValue, classValues, symbolValues));
-      cloudSync.pushSnapshot({ date: todayDateString(), totalValue, classValues, symbolValues });
+    recordCurrentSnapshot: (input) => {
+      setSnapshots(recordSnapshot(snapshots, input));
+      cloudSync.pushSnapshot({ date: todayDateString(), ...input });
     },
 
     mergeRemoteSnapshots: (remote) => {

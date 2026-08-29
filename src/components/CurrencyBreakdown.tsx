@@ -1,6 +1,13 @@
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
-import { computeCurrencyBuckets, computeDayChangePct, computeHoldingMetrics, computePreviousClassValue, computeTotalInTwd } from '../lib/calculations';
+import {
+  computeCurrencyBuckets,
+  computeDayChangeInGainPct,
+  computeHoldingMetrics,
+  computePreviousClassCostValue,
+  computePreviousClassValue,
+  computeTotalInTwd,
+} from '../lib/calculations';
 import { formatAmount, formatCurrencyIn, formatPercent } from '../lib/format';
 import { CURRENCY_LABELS } from '../types';
 
@@ -24,7 +31,12 @@ export function CurrencyBreakdown() {
       <h2>資產幣別總覽</h2>
       <div className="summary-grid">
         {buckets.map((bucket) => {
-          const changePct = computeDayChangePct(bucket.nativeTotal, computePreviousClassValue(snapshots, bucket.assetClass));
+          const changePct = computeDayChangeInGainPct(
+            bucket.nativeTotal,
+            bucket.nativeCost,
+            computePreviousClassValue(snapshots, bucket.assetClass),
+            computePreviousClassCostValue(snapshots, bucket.assetClass),
+          );
           return (
             <div className="summary-stat" key={bucket.assetClass}>
               <span className="summary-label">{bucket.label}（{CURRENCY_LABELS[bucket.currency]}）</span>

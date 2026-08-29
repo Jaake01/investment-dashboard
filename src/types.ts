@@ -103,9 +103,16 @@ export interface FxRate {
 
 export interface Snapshot {
   date: string;
-  totalValue: number; // TWD, whole-portfolio (used by the trend chart)
-  classValues?: Partial<Record<AssetClass, number>>; // native currency, per asset class
-  symbolValues?: Record<string, number>; // native currency, per holding symbol
+  totalValue: number; // TWD, whole-portfolio market value (used by the trend chart)
+  // Optional because snapshots recorded before cost tracking was added don't
+  // have it — every 較昨日 site falls back to "—" for those, the same way it
+  // already does when there's no previous snapshot at all. Cash-ledger
+  // balances count at face value (cost === value), contributing 0% gain.
+  totalCost?: number; // TWD, whole-portfolio cost basis
+  classValues?: Partial<Record<AssetClass, number>>; // native currency, per asset class (market value)
+  classCostValues?: Partial<Record<AssetClass, number>>; // native currency, per asset class (cost basis)
+  symbolValues?: Record<string, number>; // native currency, per holding symbol (market value)
+  symbolCostValues?: Record<string, number>; // native currency, per holding symbol (cost basis)
 }
 
 export interface ImportedHoldingRow {

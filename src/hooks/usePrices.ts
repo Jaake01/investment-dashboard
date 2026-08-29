@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
-import { computeClassValues, computeHoldingMetrics, computeSymbolValues, computeTotalInTwd } from '../lib/calculations';
+import {
+  computeClassCostValues,
+  computeClassValues,
+  computeHoldingMetrics,
+  computeSymbolCostValues,
+  computeSymbolValues,
+  computeTotalCostInTwd,
+  computeTotalInTwd,
+} from '../lib/calculations';
 import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { CsvImportError } from '../lib/csv';
 import { fetchQuoteSheet } from '../lib/quoteSheet';
@@ -150,12 +158,25 @@ export function usePrices() {
         // chart's day-change tracking) here rather than inside
         // computeTotalInTwd/computeClassValues — keeps 較昨日/趨勢圖
         // consistent with PortfolioSummary's "total including cash ledger".
+        // A cash balance has no cost basis of its own, so it counts equally
+        // toward both value and cost (0% gain) — same treatment as
+        // PortfolioSummary's totalCostValue.
         const cashLedgerTwd = computeCashLedgerTwdTotal(cashBalances, effectiveUsdToTwd, effectiveJpyToTwd);
         const classValues = computeClassValues(metrics);
+        const classCostValues = computeClassCostValues(metrics);
         if (cashLedgerTwd !== 0) {
           classValues.cash = (classValues.cash ?? 0) + cashLedgerTwd;
+          classCostValues.cash = (classCostValues.cash ?? 0) + cashLedgerTwd;
         }
-        recordCurrentSnapshot(totalTwd + cashLedgerTwd, classValues, computeSymbolValues(metrics));
+        const totalCostTwd = computeTotalCostInTwd(metrics, effectiveUsdToTwd);
+        recordCurrentSnapshot({
+          totalValue: totalTwd + cashLedgerTwd,
+          totalCost: totalCostTwd === null ? undefined : totalCostTwd + cashLedgerTwd,
+          classValues,
+          classCostValues,
+          symbolValues: computeSymbolValues(metrics),
+          symbolCostValues: computeSymbolCostValues(metrics),
+        });
       }
     }
 

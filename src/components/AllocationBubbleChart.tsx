@@ -3,10 +3,13 @@ import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
 import {
   computeAllocation,
+  computeClassCostValues,
   computeClassValues,
-  computeDayChangePct,
+  computeDayChangeInGainPct,
   computeHoldingMetrics,
+  computePreviousClassCostValue,
   computePreviousClassValue,
+  computePreviousSymbolCostValue,
   computePreviousSymbolValue,
   convertToTwd,
   currencyFor,
@@ -140,7 +143,14 @@ function buildBubbleData(
   const fromHoldings = entries.map(({ m, value }) => {
     const symbol = m.holding.symbol;
     const percent = total > 0 ? (value / total) * 100 : 0;
-    const changePct = symbol ? computeDayChangePct(m.marketValue, computePreviousSymbolValue(snapshots, symbol)) : null;
+    const changePct = symbol
+      ? computeDayChangeInGainPct(
+          m.marketValue,
+          m.costValue,
+          computePreviousSymbolValue(snapshots, symbol),
+          computePreviousSymbolCostValue(snapshots, symbol),
+        )
+      : null;
     return {
       key: m.holding.id,
       name: symbol || m.holding.name || '未命名',
@@ -522,6 +532,7 @@ function buildPieData(
 ): PieDatum[] {
   const slices = computeAllocation(metrics, 'assetClass', usdToTwd);
   const classValuesToday = computeClassValues(metrics);
+  const classCostValuesToday = computeClassCostValues(metrics);
   const cashLedgerTwd = Object.entries(cashBalances).reduce((sum, [currency, amount]) => {
     const rate = twdRateForCashCurrency(currency, usdToTwd, jpyToTwd);
     return rate === null ? sum : sum + amount * rate;
@@ -544,6 +555,9 @@ function buildPieData(
     const assetClass = s.key as AssetClass;
     const percent = total > 0 ? (s.value / total) * 100 : 0;
     const todayValue = (classValuesToday[assetClass] ?? 0) + (assetClass === 'cash' ? cashLedgerTwd : 0);
+    // Cash-ledger cost equals its own value (no gain/loss of its own), same
+    // treatment as todayValue's cashLedgerTwd term above.
+    const todayCost = (classCostValuesToday[assetClass] ?? 0) + (assetClass === 'cash' ? cashLedgerTwd : 0);
     return {
       key: assetClass,
       label: s.label,
@@ -551,7 +565,12 @@ function buildPieData(
       percent,
       percentLabel: `${percent.toFixed(1)}%`,
       fill: classColorFor(assetClass),
-      changePct: computeDayChangePct(todayValue, computePreviousClassValue(snapshots, assetClass)),
+      changePct: computeDayChangeInGainPct(
+        todayValue,
+        todayCost,
+        computePreviousClassValue(snapshots, assetClass),
+        computePreviousClassCostValue(snapshots, assetClass),
+      ),
     };
   });
 }

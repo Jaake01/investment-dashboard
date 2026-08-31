@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   twelveDataApiKey: '',
   twQuoteSheetUrl: '',
   cashLedgerSheetUrl: '',
+  dailyAssetSheetUrl: '',
   theme: 'system',
 };
 

@@ -253,6 +253,24 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
+        <h3>每日資產數據 Sheet（選填）</h3>
+        <p className="settings-hint">
+          每日快照目前只從設定這個功能之後才開始累積歷史。想要更早的走勢，可以用 Apps Script
+          依照「交易紀錄」分頁＋歷史股價（GOOGLEFINANCE）回算出每一天的市值與成本，寫進新分頁「每日資產數據」。
+          「檔案 → 共用 → 發布到網路」，只選這個分頁、格式選 CSV，把產生的網址貼在下方。這份資料只用來補早期歷史，
+          跟每天自動記錄的快照有重疊的日期一律以自動快照為準。
+        </p>
+        <div className="settings-row">
+          <input
+            type="text"
+            placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+            value={settings.dailyAssetSheetUrl}
+            onChange={(e) => setSettings({ dailyAssetSheetUrl: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="settings-group">
         <h3>匯率</h3>
         <p className="settings-hint">
           {effectiveUsdToTwd === null

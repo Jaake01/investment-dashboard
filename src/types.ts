@@ -60,6 +60,12 @@ export interface Settings {
   // with the 交易紀錄 tab via an Apps Script trigger. Summed by currency to
   // show current cash balances, independent of any 現金-class Holding.
   cashLedgerSheetUrl: string;
+  // Optional: CSV published from a "每日資產數據" Google Sheet tab — computed
+  // from the 交易紀錄 ledger plus historical GOOGLEFINANCE prices by an
+  // external Apps Script, so it can backfill history from further back than
+  // the daily-snapshot GitHub Action has been running. Merged into the same
+  // `snapshots` history as that Action's data (see useRemoteSnapshots).
+  dailyAssetSheetUrl: string;
   // 'system' follows the OS/browser prefers-color-scheme; 'light'/'dark' force it.
   theme: Theme;
 }

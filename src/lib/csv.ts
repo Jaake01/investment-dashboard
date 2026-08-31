@@ -161,6 +161,7 @@ export function parseDailyAssetCsv(csvText: string): Snapshot[] {
     };
     assign('us_stock', '美股市值(USD)', '美股成本(USD)');
     assign('tw_stock', '台股市值(TWD)', '台股成本(TWD)');
+    assign('cash', '現金市值(TWD)', '現金成本(TWD)');
     assign('crypto', '加密貨幣市值(USD)', '加密貨幣成本(USD)');
     assign('other', '其他市值(TWD)', '其他成本(TWD)');
 

@@ -125,6 +125,17 @@ h3 {
   background: var(--bg);
 }
 
+/* Groups multiple controls (a <select>, a .theme-toggle tab group, ...) as a
+   single flex child on the right side of a .card-header, since card-header
+   itself only expects two children (heading | controls) for its
+   space-between layout. */
+.card-header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .theme-toggle-btn {
   border: none;
   background: none;

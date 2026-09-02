@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { AssetClass, ImportedHoldingRow, Transaction, TransactionAction } from '../types';
+import type { AssetClass, ImportedHoldingRow, Snapshot, Transaction, TransactionAction } from '../types';
 import { ASSET_CLASSES } from '../types';
 import { processTransactions } from './transactions';
 import { guessAssetClassFromSymbol } from './symbolClass';
@@ -122,6 +122,58 @@ export function parseTransactionsCsv(csvText: string): Transaction[] {
       amount: parseNumber(row[amountKey], '成交金額', index),
     };
   });
+}
+
+// Parses the "每日資產數據" tab an external Apps Script (not part of this
+// repo) computes from the 交易紀錄 ledger plus historical GOOGLEFINANCE
+// prices — column headers are that script's fixed output contract, not
+// user-provided data, so matched literally rather than fuzzy-detected like
+// the holdings/transaction CSVs above.
+export function parseDailyAssetCsv(csvText: string): Snapshot[] {
+  const result = Papa.parse<Record<string, string>>(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim(),
+  });
+  if (result.errors.length > 0) {
+    throw new CsvImportError(`CSV 解析失敗：${result.errors[0].message}`);
+  }
+
+  const num = (v: string | undefined): number | undefined => {
+    if (v === undefined || v.trim() === '') return undefined;
+    const n = Number(v.replace(/[,$\s]/g, ''));
+    return Number.isNaN(n) ? undefined : n;
+  };
+
+  const snapshots: Snapshot[] = [];
+  for (const row of result.data) {
+    const date = (row['日期'] ?? '').trim();
+    const totalValue = num(row['總市值(TWD)']);
+    if (!date || totalValue === undefined) continue;
+
+    const classValues: Partial<Record<AssetClass, number>> = {};
+    const classCostValues: Partial<Record<AssetClass, number>> = {};
+    const assign = (assetClass: AssetClass, valueCol: string, costCol: string) => {
+      const v = num(row[valueCol]);
+      const c = num(row[costCol]);
+      if (v !== undefined) classValues[assetClass] = v;
+      if (c !== undefined) classCostValues[assetClass] = c;
+    };
+    assign('us_stock', '美股市值(USD)', '美股成本(USD)');
+    assign('tw_stock', '台股市值(TWD)', '台股成本(TWD)');
+    assign('cash', '現金市值(TWD)', '現金成本(TWD)');
+    assign('crypto', '加密貨幣市值(USD)', '加密貨幣成本(USD)');
+    assign('other', '其他市值(TWD)', '其他成本(TWD)');
+
+    snapshots.push({
+      date,
+      totalValue,
+      totalCost: num(row['總成本(TWD)']),
+      classValues,
+      classCostValues,
+    });
+  }
+  return snapshots;
 }
 
 function isTransactionLedgerCsv(headerRow: Record<string, string>): boolean {

@@ -5,6 +5,7 @@ import { CashLedgerCard } from './CashLedgerCard';
 import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
+import { UsStockGainChart } from './UsStockGainChart';
 import { RealizedGains } from './RealizedGains';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
@@ -75,6 +76,7 @@ export function Layout() {
             <CashLedgerCard />
             <AllocationBubbleChart />
             <TrendChart />
+            <UsStockGainChart />
             <HoldingsTable />
           </>
         )}

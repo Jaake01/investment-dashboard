@@ -1,0 +1,717 @@
+[
+  {
+    "date": "2026-07-24",
+    "totalValue": 1170384.1500437069,
+    "classValues": {
+      "us_stock": 1608.0499499999999,
+      "tw_stock": 60000,
+      "crypto": 32711.94
+    },
+    "symbolValues": {
+      "2330": 60000,
+      "AAPL": 1608.0499499999999,
+      "BTC": 32711.94
+    }
+  },
+  {
+    "date": "2026-07-25",
+    "totalValue": 1149387.0064177841,
+    "classValues": {
+      "us_stock": 1665.350035,
+      "tw_stock": 60000,
+      "crypto": 31996.76
+    },
+    "symbolValues": {
+      "2330": 60000,
+      "AAPL": 1665.350035,
+      "BTC": 31996.76
+    }
+  },
+  {
+    "date": "2026-07-26",
+    "totalValue": 1154534.8068170578,
+    "classValues": {
+      "us_stock": 1665.350035,
+      "tw_stock": 60000,
+      "crypto": 32180.53
+    },
+    "symbolValues": {
+      "2330": 60000,
+      "AAPL": 1665.350035,
+      "BTC": 32180.53
+    }
+  },
+  {
+    "date": "2026-07-27",
+    "totalValue": 1169728.0988085023,
+    "classValues": {
+      "us_stock": 1665.350035,
+      "tw_stock": 60000,
+      "crypto": 32676.3
+    },
+    "symbolValues": {
+      "2330": 60000,
+      "AAPL": 1665.350035,
+      "BTC": 32676.3
+    }
+  },
+  {
+    "date": "2026-07-28",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "tw_stock": 31216
+    },
+    "symbolValues": {
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "CRCL": null,
+      "MSTR": null,
+      "TSLA": null,
+      "BNB": null,
+      "SOL": null,
+      "MSFT": null,
+      "PLTR": null,
+      "GOOGL": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null
+    }
+  },
+  {
+    "date": "2026-07-29",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null
+    }
+  },
+  {
+    "date": "2026-07-30",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": 187328,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null
+    }
+  },
+  {
+    "date": "2026-07-31",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null
+    }
+  },
+  {
+    "date": "2026-08-01",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null
+    }
+  },
+  {
+    "date": "2026-08-02",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null
+    }
+  },
+  {
+    "date": "2026-08-03",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null,
+      "VRT": null
+    }
+  },
+  {
+    "date": "2026-08-04",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 294400
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "3017": 16240,
+      "3324": 14976,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "AMD": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null,
+      "VRT": null
+    }
+  },
+  {
+    "date": "2026-08-05",
+    "totalValue": null,
+    "classValues": {
+      "crypto": null,
+      "us_stock": null,
+      "cash": null,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": null,
+      "NEXO": null,
+      "BNB": null,
+      "SOL": null,
+      "CRCL": null,
+      "TSLA": null,
+      "GOOGL": null,
+      "STRC": null,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": null,
+      "MSFT": null,
+      "PLTR": null,
+      "NVDA": null,
+      "MU": null,
+      "AVGO": null,
+      "ETN": null,
+      "MRVL": null,
+      "VRT": null
+    }
+  },
+  {
+    "date": "2026-08-27",
+    "totalValue": 5171641.497863421,
+    "classValues": {
+      "crypto": 74451.00314480129,
+      "us_stock": 49869.27568528604,
+      "cash": 187837.6,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 57366.13283192665,
+      "NEXO": 3492.946788331072,
+      "BNB": 10215.704981544284,
+      "SOL": 3376.218542999289,
+      "CRCL": 7012.167070524412,
+      "TSLA": 6224.76018,
+      "GOOGL": 2392.9245283018868,
+      "STRC": 25261.6,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4804.41,
+      "MSFT": 2977.9624130773223,
+      "NVDA": 5661.449924887332,
+      "MU": 0.5116684950928954,
+      "AVGO": 9956.519999999999,
+      "ETN": 4613.84,
+      "VRT": 3429.53,
+      "CEG": 2795.1999
+    }
+  },
+  {
+    "date": "2026-08-28",
+    "totalValue": 5284920.679500276,
+    "classValues": {
+      "crypto": 75446.41499162736,
+      "us_stock": 52712.14949492178,
+      "cash": 188056,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 58065.281623188006,
+      "NEXO": 3466.8456996846435,
+      "BNB": 10343.953206264601,
+      "SOL": 3570.3344624901,
+      "CRCL": 7349.8679205584,
+      "TSLA": 6386.58,
+      "GOOGL": 2383.4787050089462,
+      "STRC": 25480,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 5358.59961,
+      "MSFT": 3030.097892164638,
+      "NVDA": 6156.144968189799,
+      "AVGO": 11146.2003,
+      "ETN": 4576.440099,
+      "VRT": 3500.6399999999994,
+      "CEG": 2824.1000000000004
+    }
+  },
+  {
+    "date": "2026-08-29",
+    "totalValue": 5184143.205488185,
+    "totalCost": 5474882.153775752,
+    "classValues": {
+      "crypto": 73990.60193530632,
+      "us_stock": 51022.99966248064,
+      "cash": 187881.8,
+      "tw_stock": 263184
+    },
+    "classCostValues": {
+      "crypto": 84149,
+      "us_stock": 50602.97182688284,
+      "cash": 187328,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 56986.63470745,
+      "NEXO": 3423.3583332441026,
+      "BNB": 10058.553691383599,
+      "SOL": 3522.0552032286,
+      "CRCL": 6796.1321158474,
+      "TSLA": 6277.5,
+      "GOOGL": 2425.0400957565,
+      "STRC": 25305.8,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4965.09,
+      "MSFT": 3080.9136887262316,
+      "NVDA": 5874.5036311505,
+      "AVGO": 11063.7003,
+      "ETN": 4430.58,
+      "VRT": 3342.039831,
+      "CEG": 2767.5
+    },
+    "symbolCostValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 65308.00000000001,
+      "NEXO": 4495,
+      "BNB": 10888,
+      "SOL": 3458,
+      "CRCL": 6431.999999999999,
+      "TSLA": 7093,
+      "GOOGL": 2336,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4043,
+      "MSFT": 2279.9718268828346,
+      "NVDA": 5721,
+      "AVGO": 12102,
+      "ETN": 4573,
+      "VRT": 3289,
+      "CEG": 2734
+    }
+  },
+  {
+    "date": "2026-08-31",
+    "totalValue": 5157495.131468909,
+    "totalCost": 5474457.873210692,
+    "classValues": {
+      "crypto": 73161.33939036823,
+      "us_stock": 51022.99966248064,
+      "cash": 187881.8,
+      "tw_stock": 263184
+    },
+    "classCostValues": {
+      "crypto": 84149,
+      "us_stock": 50602.97182688284,
+      "cash": 187328,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 56383.99013724401,
+      "NEXO": 3484.268327816716,
+      "BNB": 9923.188628854801,
+      "SOL": 3369.8922964526996,
+      "CRCL": 6796.1321158474,
+      "TSLA": 6277.5,
+      "GOOGL": 2425.0400957565,
+      "STRC": 25305.8,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4965.09,
+      "MSFT": 3080.9136887262316,
+      "NVDA": 5874.5036311505,
+      "AVGO": 11063.7003,
+      "ETN": 4430.58,
+      "VRT": 3342.039831,
+      "CEG": 2767.5
+    },
+    "symbolCostValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 65308.00000000001,
+      "NEXO": 4495,
+      "BNB": 10888,
+      "SOL": 3458,
+      "CRCL": 6431.999999999999,
+      "TSLA": 7093,
+      "GOOGL": 2336,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4043,
+      "MSFT": 2279.9718268828346,
+      "NVDA": 5721,
+      "AVGO": 12102,
+      "ETN": 4573,
+      "VRT": 3289,
+      "CEG": 2734
+    }
+  },
+  {
+    "date": "2026-09-01",
+    "totalValue": 5194772.335975871,
+    "totalCost": 5516747.527941242,
+    "classValues": {
+      "crypto": 73193.69716937101,
+      "us_stock": 52129.0400842597,
+      "cash": 187744,
+      "tw_stock": 263184
+    },
+    "classCostValues": {
+      "crypto": 84149,
+      "us_stock": 51749.97182688284,
+      "cash": 187328,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 56503.241925648006,
+      "NEXO": 3423.0328472649076,
+      "BNB": 9930.160220058,
+      "SOL": 3337.2621764001,
+      "CRCL": 6978.630958526801,
+      "TSLA": 6409.619928,
+      "GOOGL": 2344.086402391591,
+      "STRC": 25168,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4870.32,
+      "MSFT": 3005.859934686908,
+      "NVDA": 5871.5333006544,
+      "AVGO": 11829.75968,
+      "ETN": 4688.51988,
+      "VRT": 3327.61,
+      "CEG": 2803.1
+    },
+    "symbolCostValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 65308.00000000001,
+      "NEXO": 4495,
+      "BNB": 10888,
+      "SOL": 3458,
+      "CRCL": 6431.999999999999,
+      "TSLA": 7093,
+      "GOOGL": 2336,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4043,
+      "MSFT": 2279.9718268828346,
+      "NVDA": 5721,
+      "AVGO": 12846,
+      "ETN": 4976,
+      "VRT": 3289,
+      "CEG": 2734
+    }
+  },
+  {
+    "date": "2026-09-02",
+    "totalValue": 5199795.9726207405,
+    "totalCost": 5525112.624044269,
+    "classValues": {
+      "crypto": 72941.65925402439,
+      "us_stock": 52222.27511136752,
+      "cash": 187814.2,
+      "tw_stock": 263184
+    },
+    "classCostValues": {
+      "crypto": 84149,
+      "us_stock": 51749.97182688284,
+      "cash": 187328,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 56227.0216396,
+      "NEXO": 3391.4986840355887,
+      "BNB": 9990.8711601192,
+      "SOL": 3332.2677702695996,
+      "CRCL": 6913.1185534624,
+      "TSLA": 6426.18018,
+      "GOOGL": 2358.779875592,
+      "STRC": 25238.199999999997,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4804.41,
+      "MSFT": 2980.662240224011,
+      "NVDA": 6059.7442420891,
+      "AVGO": 11751.67968,
+      "ETN": 4690.2001199999995,
+      "VRT": 3337.1001300000003,
+      "CEG": 2900.40009
+    },
+    "symbolCostValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 65308.00000000001,
+      "NEXO": 4495,
+      "BNB": 10888,
+      "SOL": 3458,
+      "CRCL": 6431.999999999999,
+      "TSLA": 7093,
+      "GOOGL": 2336,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4043,
+      "MSFT": 2279.9718268828346,
+      "NVDA": 5721,
+      "AVGO": 12846,
+      "ETN": 4976,
+      "VRT": 3289,
+      "CEG": 2734
+    }
+  },
+  {
+    "date": "2026-09-03",
+    "totalValue": 5394994.511547599,
+    "totalCost": 5521830.524689846,
+    "classValues": {
+      "crypto": 76580.35115927775,
+      "us_stock": 54638.98134553756,
+      "cash": 188009.2,
+      "tw_stock": 263184
+    },
+    "classCostValues": {
+      "crypto": 84149,
+      "us_stock": 51749.97182688284,
+      "cash": 187328,
+      "tw_stock": 263184
+    },
+    "symbolValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 59135.860949382004,
+      "NEXO": 3458.768768160443,
+      "BNB": 10522.6002308466,
+      "SOL": 3463.1212108887003,
+      "CRCL": 8051.0066366643005,
+      "TSLA": 6774.56982,
+      "GOOGL": 2396.2830902365536,
+      "STRC": 25433.199999999997,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 5647.98039,
+      "MSFT": 3060.4552783272,
+      "NVDA": 6168.8363803095,
+      "AVGO": 11429.12,
+      "ETN": 4765.4400000000005,
+      "VRT": 3494.78987,
+      "CEG": 2850.49988
+    },
+    "symbolCostValues": {
+      "2308": 20634,
+      "2330": 242550,
+      "BTC": 65308.00000000001,
+      "NEXO": 4495,
+      "BNB": 10888,
+      "SOL": 3458,
+      "CRCL": 6431.999999999999,
+      "TSLA": 7093,
+      "GOOGL": 2336,
+      "STRC": 24752,
+      "0056": 93234,
+      "020020": 69342,
+      "MSTR": 4043,
+      "MSFT": 2279.9718268828346,
+      "NVDA": 5721,
+      "AVGO": 12846,
+      "ETN": 4976,
+      "VRT": 3289,
+      "CEG": 2734
+    }
+  }
+]

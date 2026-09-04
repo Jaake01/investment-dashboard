@@ -93,7 +93,10 @@ export function formatPercent(value: number): string {
 // (past week) instead, not from query text.
 export function googleNewsUrlFor(symbol: string): string {
   const params = new URLSearchParams({
-    q: symbol,
+    // Appending "新聞" biases results toward Chinese-language coverage —
+    // searching the bare ticker (e.g. "BTC") mostly surfaces English
+    // financial news even with hl/gl set to zh-TW/TW.
+    q: `${symbol} 新聞`,
     tbm: 'nws',
     tbs: 'qdr:w,sbd:1',
     hl: 'zh-TW',

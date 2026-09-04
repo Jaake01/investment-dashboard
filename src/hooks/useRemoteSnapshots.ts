@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
+import { mergeSnapshots } from '../lib/calculations';
 import { REMOTE_SNAPSHOTS_URL } from '../lib/config';
 import { CsvImportError, parseDailyAssetCsv } from '../lib/csv';
 import type { Snapshot } from '../types';
@@ -25,18 +26,23 @@ export function useRemoteSnapshots() {
     hasFetchedOnMount = true;
 
     (async () => {
-      // Sheet-backfilled history is merged first so the GitHub Action's
-      // snapshot (fetched live at the moment prices were refreshed, and the
-      // only source with cash-ledger data folded in) wins on any date both
-      // cover — mergeSnapshots always prefers whichever side is merged in
-      // second/local.
+      // Combine both remote sources into one array with plain function calls
+      // — not two separate calls into the context's mergeRemoteSnapshots —
+      // before ever touching React state. mergeRemoteSnapshots is a closure
+      // captured once when this effect was created (empty dep array), so it
+      // always closes over whatever `snapshots` was at that first render; a
+      // second call from the same effect body would merge against that same
+      // stale snapshot instead of the first call's result, silently
+      // discarding most of what the first merge just added. Merging locally
+      // first and calling into the context exactly once sidesteps that.
+      let combinedRemote: Snapshot[] = [];
+
       if (settings.dailyAssetSheetUrl.trim()) {
         try {
           const res = await fetch(settings.dailyAssetSheetUrl, { cache: 'no-store' });
           if (res.ok) {
             const text = await res.text();
-            const dailyAsset = parseDailyAssetCsv(text);
-            if (dailyAsset.length > 0) mergeRemoteSnapshots(dailyAsset);
+            combinedRemote = parseDailyAssetCsv(text);
           }
         } catch (err) {
           // best-effort only — an unreachable/misconfigured Sheet shouldn't
@@ -47,17 +53,24 @@ export function useRemoteSnapshots() {
 
       try {
         const res = await fetch(REMOTE_SNAPSHOTS_URL, { cache: 'no-store' });
-        if (!res.ok) return; // workflow not set up yet, or no history published yet
-        const remote = (await res.json()) as Snapshot[];
-        if (Array.isArray(remote) && remote.length > 0) {
-          mergeRemoteSnapshots(remote);
-          setLastRemoteDate(remote[remote.length - 1].date);
+        if (res.ok) {
+          const remote = (await res.json()) as Snapshot[];
+          if (Array.isArray(remote) && remote.length > 0) {
+            // GitHub Action's snapshot (fetched live at the moment prices
+            // were refreshed, and the only source with cash-ledger data
+            // folded in) wins on any date both sources cover — it's passed
+            // as the "local" argument, which mergeSnapshots always prefers.
+            combinedRemote = mergeSnapshots(remote, combinedRemote);
+            setLastRemoteDate(remote[remote.length - 1].date);
+          }
         }
       } catch {
         // best-effort only — local manual refresh still works without this
       } finally {
         setChecked(true);
       }
+
+      if (combinedRemote.length > 0) mergeRemoteSnapshots(combinedRemote);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

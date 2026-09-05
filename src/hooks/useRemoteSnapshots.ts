@@ -54,13 +54,21 @@ export function useRemoteSnapshots() {
       try {
         const res = await fetch(REMOTE_SNAPSHOTS_URL, { cache: 'no-store' });
         if (res.ok) {
-          const remote = (await res.json()) as Snapshot[];
-          if (Array.isArray(remote) && remote.length > 0) {
-            // GitHub Action's snapshot (fetched live at the moment prices
-            // were refreshed, and the only source with cash-ledger data
-            // folded in) wins on any date both sources cover — it's passed
-            // as the "local" argument, which mergeSnapshots always prefers.
-            combinedRemote = mergeSnapshots(remote, combinedRemote);
+          const raw = (await res.json()) as Snapshot[];
+          // Runs of the Action from before it learned to abort on a missing
+          // FX rate left rows with a null total baked into snapshots.json.
+          // Those have to be dropped rather than merged: remote snapshots win
+          // over local ones for past dates, so a null total doesn't just fail
+          // to help — it blanks out a day the Sheet has a real value for.
+          const remote = Array.isArray(raw) ? raw.filter((s) => Number.isFinite(s.totalValue)) : [];
+          if (remote.length > 0) {
+            // The Sheet wins on any date both cover. It replays the whole
+            // 交易紀錄 ledger *and* the 現金帳戶 balances for every calendar
+            // day, whereas the Action records holdings only — so the Action's
+            // totals sit a cash-ledger's worth lower (~1M TWD here), and
+            // letting them win put a cliff in the trend chart on whichever
+            // day the Action's history happened to start.
+            combinedRemote = mergeSnapshots(combinedRemote, remote);
             setLastRemoteDate(remote[remote.length - 1].date);
           }
         }

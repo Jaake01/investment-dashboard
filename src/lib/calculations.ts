@@ -250,6 +250,27 @@ export function mergeSnapshots(local: Snapshot[], remote: Snapshot[]): Snapshot[
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Same idea as mergeSnapshots, but with the priority flipped for every date
+// except today: remote (the daily-snapshot Action + 每日資產數據 Sheet,
+// see useRemoteSnapshots) wins for any past date, and local only wins for
+// today. A locally-recorded snapshot for a past date is frozen forever the
+// moment it's written — there's no "refresh yesterday's price" action that
+// would ever update it — so an old local record made before a bug fix (or
+// before cost tracking existed at all) stays wrong permanently unless
+// something newer is allowed to override it. Today's local record is the
+// exception: it's recomputed on every price refresh and is the only source
+// with the 現金帳戶 cash-ledger balance folded in, so it stays authoritative
+// for as long as it's still today.
+export function mergeSnapshotsPreferRemoteExceptToday(local: Snapshot[], remote: Snapshot[], today: string): Snapshot[] {
+  const byDate = new Map<string, Snapshot>();
+  for (const s of local) byDate.set(s.date, s);
+  for (const s of remote) {
+    if (s.date === today) continue;
+    byDate.set(s.date, s);
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // USDC is treated as 1:1 with USD, so both convert via the same USD/TWD rate.
 export function convertToTwd(nativeValue: number, currency: Currency, usdToTwd: number | null): number | null {
   if (currency === 'TWD') return nativeValue;

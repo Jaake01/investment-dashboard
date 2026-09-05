@@ -265,7 +265,11 @@ export function mergeSnapshotsPreferRemoteExceptToday(local: Snapshot[], remote:
   const byDate = new Map<string, Snapshot>();
   for (const s of local) byDate.set(s.date, s);
   for (const s of remote) {
-    if (s.date === today) continue;
+    // Today's exception only applies when there actually is a local record to
+    // prefer. Skipping remote unconditionally left today blank on any browser
+    // that hadn't refreshed prices yet — dropping the newest point off the
+    // trend chart even though a remote source had it.
+    if (s.date === today && byDate.has(today)) continue;
     byDate.set(s.date, s);
   }
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));

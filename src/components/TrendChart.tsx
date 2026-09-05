@@ -40,7 +40,11 @@ function buildTrendPoints(snapshots: Snapshot[], series: Series, range: RangeDay
   const valueByDate = new Map<string, number>();
   for (const s of snapshots) {
     const v = series === 'total' ? s.totalValue : s.classValues?.[series];
-    if (v !== undefined) valueByDate.set(s.date, v);
+    // Non-finite values (a null total from an old daily-snapshot Action run)
+    // count as "no reading" rather than as a data point — otherwise such a
+    // date can become the series' first or last point and shift the whole
+    // selected range onto days that render as an empty gap.
+    if (Number.isFinite(v)) valueByDate.set(s.date, v as number);
   }
   const dates = Array.from(valueByDate.keys()).sort();
   if (dates.length === 0) return [];

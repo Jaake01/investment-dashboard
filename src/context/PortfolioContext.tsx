@@ -5,7 +5,7 @@ import { useCloudSync, type SyncStatus } from '../hooks/useCloudSync';
 import { storageKey } from '../lib/storage';
 import { newId } from '../lib/id';
 import { recordSnapshot, type SnapshotInput } from '../hooks/useSnapshots';
-import { mergeSnapshots, todayDateString } from '../lib/calculations';
+import { mergeSnapshotsPreferRemoteExceptToday, todayDateString } from '../lib/calculations';
 import { DEFAULT_SHEET_URL } from '../lib/config';
 
 // Pre-filled with the owner's own published sheet so the dashboard connects
@@ -198,7 +198,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
     mergeRemoteSnapshots: (remote) => {
       const priorDates = new Set(snapshots.map((s) => s.date));
-      const merged = mergeSnapshots(snapshots, remote);
+      const merged = mergeSnapshotsPreferRemoteExceptToday(snapshots, remote, todayDateString());
       setSnapshots(merged);
       const newlyAdded = merged.filter((s) => !priorDates.has(s.date));
       for (const s of newlyAdded) cloudSync.pushSnapshot(s);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
 import type { FxRate, Holding, ImportedHoldingRow, PriceEntry, Settings, Snapshot, Transaction } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useCloudSync, type SyncStatus } from '../hooks/useCloudSync';
@@ -94,6 +94,19 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactionsState] = useLocalStorage<Transaction[]>(storageKey('transactions'), []);
 
   const cloudSync = useCloudSync({ holdings, setHoldings, settings, setSettingsState, snapshots, setSnapshots });
+
+  // Snapshot writes have to survive being interleaved. Two of them run
+  // asynchronously and finish minutes apart: useRemoteSnapshots merges the
+  // 每日資產數據 Sheet as soon as it downloads, while a price refresh sleeps
+  // 8s between quotes and only then records today's snapshot. Computing the
+  // next array from a `snapshots` captured at render time made whichever
+  // finished last overwrite the other wholesale — the Sheet's months of
+  // history kept vanishing behind a price refresh that started before it
+  // landed. The setters below therefore all derive from `prev`. This ref is
+  // only for the cloud-push diffs, which just need "what did we have a moment
+  // ago" and are idempotent upserts anyway.
+  const snapshotsRef = useRef(snapshots);
+  snapshotsRef.current = snapshots;
 
   const value = useMemo<PortfolioContextValue>(() => ({
     holdings,
@@ -192,16 +205,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     },
 
     recordCurrentSnapshot: (input) => {
-      setSnapshots(recordSnapshot(snapshots, input));
+      setSnapshots((prev) => recordSnapshot(prev, input));
       cloudSync.pushSnapshot({ date: todayDateString(), ...input });
     },
 
     mergeRemoteSnapshots: (remote) => {
-      const priorDates = new Set(snapshots.map((s) => s.date));
-      const merged = mergeSnapshotsPreferRemoteExceptToday(snapshots, remote, todayDateString());
-      setSnapshots(merged);
-      const newlyAdded = merged.filter((s) => !priorDates.has(s.date));
-      for (const s of newlyAdded) cloudSync.pushSnapshot(s);
+      const priorDates = new Set(snapshotsRef.current.map((s) => s.date));
+      setSnapshots((prev) => mergeSnapshotsPreferRemoteExceptToday(prev, remote, todayDateString()));
+      for (const s of remote) {
+        if (!priorDates.has(s.date)) cloudSync.pushSnapshot(s);
+      }
     },
 
     setFxRate: (rate) => {

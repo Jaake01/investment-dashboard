@@ -145,6 +145,17 @@ export function parseDailyAssetCsv(csvText: string): Snapshot[] {
     return Number.isNaN(n) ? undefined : n;
   };
 
+  // Without this, a CSV of the wrong tab (or a sheet whose headers drifted)
+  // parses "successfully" into zero snapshots and the dashboard just shows no
+  // history — indistinguishable from an empty sheet, and impossible to tell
+  // apart from the outside.
+  const first = result.data[0];
+  if (first && !('日期' in first && '總市值(TWD)' in first)) {
+    throw new CsvImportError(
+      `找不到「日期」或「總市值(TWD)」欄位，請確認「發布到網路」發布的是「每日資產數據」分頁。實際讀到的欄位：${Object.keys(first).join('、')}`,
+    );
+  }
+
   const snapshots: Snapshot[] = [];
   for (const row of result.data) {
     const date = (row['日期'] ?? '').trim();

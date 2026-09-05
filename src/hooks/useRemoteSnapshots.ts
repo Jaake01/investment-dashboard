@@ -37,18 +37,36 @@ export function useRemoteSnapshots() {
       // first and calling into the context exactly once sidesteps that.
       let combinedRemote: Snapshot[] = [];
 
+      // Every outcome here gets reported. This used to fail silently — a
+      // non-ok response was ignored and a CsvImportError was swallowed
+      // outright — so a Sheet that wasn't loading looked exactly like one
+      // with nothing in it, and the only visible symptom was a trend chart
+      // missing months of history for no stated reason. It stays best-effort
+      // (a broken Sheet must not block the GitHub Action fetch below), but
+      // never silent.
       if (settings.dailyAssetSheetUrl.trim()) {
         try {
           const res = await fetch(settings.dailyAssetSheetUrl, { cache: 'no-store' });
-          if (res.ok) {
+          if (!res.ok) {
+            console.error(`每日資產數據 Sheet 讀取失敗：HTTP ${res.status} ${res.statusText}`);
+          } else {
             const text = await res.text();
             combinedRemote = parseDailyAssetCsv(text);
+            console.info(
+              `每日資產數據 Sheet：讀到 ${combinedRemote.length} 天` +
+                (combinedRemote.length > 0
+                  ? `（${combinedRemote[0].date} ~ ${combinedRemote[combinedRemote.length - 1].date}）`
+                  : ''),
+            );
           }
         } catch (err) {
-          // best-effort only — an unreachable/misconfigured Sheet shouldn't
-          // block the GitHub Action snapshot fetch below
-          if (!(err instanceof CsvImportError)) console.error('每日資產數據 Sheet 讀取失敗', err);
+          console.error(
+            '每日資產數據 Sheet 讀取失敗',
+            err instanceof CsvImportError ? err.message : err,
+          );
         }
+      } else {
+        console.info('每日資產數據 Sheet：設定裡沒有填網址，略過');
       }
 
       try {
@@ -78,7 +96,10 @@ export function useRemoteSnapshots() {
         setChecked(true);
       }
 
-      if (combinedRemote.length > 0) mergeRemoteSnapshots(combinedRemote);
+      if (combinedRemote.length > 0) {
+        console.info(`遠端快照合併：送出 ${combinedRemote.length} 天（Sheet + GitHub Action）`);
+        mergeRemoteSnapshots(combinedRemote);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

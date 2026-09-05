@@ -126,15 +126,18 @@ export function useCloudSync({ holdings, setHoldings, settings, setSettingsState
       if (!snapshotsReady) {
         snapshotsReady = true;
         const remoteSnapshots = changes.map((c) => c.data).filter((s): s is Snapshot => s !== null);
-        // Reuses the exact same local-wins-on-date-collision merge already
-        // used for the GitHub daily-snapshot branch — no new algorithm.
-        const merged = mergeSnapshots(snapshotsRef.current, remoteSnapshots);
         const remoteDates = new Set(remoteSnapshots.map((s) => s.date));
-        const newOnly = merged.filter((s) => !remoteDates.has(s.date));
+        // Upload whatever this device has that the cloud doesn't yet.
+        const newOnly = snapshotsRef.current.filter((s) => !remoteDates.has(s.date));
         if (newOnly.length > 0) {
           batchUpsertSnapshots(uid, newOnly).catch(reportError);
         }
-        setSnapshots(merged);
+        // Merge over `prev`, not over the ref: this callback fires whenever
+        // Firestore first responds, which can land either side of the
+        // 每日資產數據 Sheet merge. Setting a value computed from a
+        // point-in-time copy would drop whichever of the two arrived first.
+        // Same local-wins-on-date-collision merge as before.
+        setSnapshots((prev) => mergeSnapshots(prev, remoteSnapshots));
         maybeGoIdle();
         return;
       }

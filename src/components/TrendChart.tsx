@@ -66,7 +66,10 @@ function buildTrendPoints(snapshots: Snapshot[], series: Series, range: RangeDay
 export function TrendChart() {
   const { snapshots } = usePortfolio();
   const [series, setSeries] = useState<Series>('total');
-  const [range, setRange] = useState<RangeDays>('all');
+  // Defaults to the last month rather than the full history: with months of
+  // data the whole range flattens recent movement into a straight line, and
+  // the last month is what actually gets looked at day to day.
+  const [range, setRange] = useState<RangeDays>(30);
   const gradientId = useId();
 
   const currency = series === 'total' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[series];
@@ -80,7 +83,11 @@ export function TrendChart() {
         <h2>歷史趨勢</h2>
         <div className="card-header-controls">
           <select value={series} onChange={(e) => setSeries(e.target.value as Series)}>
-            <option value="total">總市值（{CURRENCY_LABELS.TWD}）</option>
+            {/* Named 總資產 to match the summary card at the top of the page:
+                totalValue already has the 現金帳戶 balance folded in (see
+                usePrices.ts), so this really is the whole account, not just
+                the holdings' market value. */}
+            <option value="total">總資產（{CURRENCY_LABELS.TWD}）</option>
             {ASSET_CLASSES.map((assetClass) => (
               <option key={assetClass} value={assetClass}>
                 {ASSET_CLASS_LABELS[assetClass]}（{CURRENCY_LABELS[CURRENCY_FOR_ASSET_CLASS[assetClass]]}）
@@ -118,7 +125,7 @@ export function TrendChart() {
             <Area
               type="monotone"
               dataKey="value"
-              name={series === 'total' ? '總市值' : ASSET_CLASS_LABELS[series]}
+              name={series === 'total' ? '總資產' : ASSET_CLASS_LABELS[series]}
               stroke="var(--accent)"
               strokeWidth={2}
               fill={`url(#${gradientId})`}

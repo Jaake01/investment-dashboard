@@ -51,10 +51,14 @@ export interface Settings {
   // require re-pasting whichever one you used before.
   finnhubApiKey: string;
   twelveDataApiKey: string;
-  // Optional: CSV published from a Google Sheet tab using GOOGLEFINANCE, for
-  // TW stock quotes — Finnhub/Twelve Data's free tiers don't reliably cover
-  // TWSE. Takes priority over priceProvider for tw_stock holdings.
-  twQuoteSheetUrl: string;
+  // Optional: CSV published from the GAS-maintained "股價歷史" Google Sheet
+  // tab (symbol/date/close), for TW stock quotes — Finnhub/Twelve Data's free
+  // tiers don't reliably cover TWSE. Takes priority over priceProvider for
+  // tw_stock holdings. Used to be a separate tab with a live GOOGLEFINANCE
+  // formula, but that only recalculates when the sheet is opened, so it went
+  // stale silently; 股價歷史 is written by a scheduled trigger instead, so
+  // it's only ever as stale as "days since the trigger last ran".
+  priceHistorySheetUrl: string;
   // Optional: CSV published from a "現金帳戶" Google Sheet tab — an
   // append-only cash ledger (date/currency/type/amount/note) kept in sync
   // with the 交易紀錄 tab via an Apps Script trigger. Summed by currency to

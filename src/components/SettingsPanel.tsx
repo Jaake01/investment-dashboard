@@ -216,20 +216,21 @@ export function SettingsPanel() {
       </div>
 
       <div className="settings-group">
-        <h3>台股報價（GOOGLEFINANCE，選填）</h3>
+        <h3>台股報價（股價歷史，選填）</h3>
         <p className="settings-hint">
-          Finnhub／Twelve Data 的免費方案都不保證能查到台股（TWSE）即時報價。這裡改用 Google Sheet 的 GOOGLEFINANCE
-          當免費資料來源：在你的 Google Sheet 新增一個分頁，A 欄放代號（例如 2330），標題列打「symbol」；B 欄公式打
-          =GOOGLEFINANCE("TPE:"&A2,"price")，標題列打「price」。想要「漲跌」欄也有資料的話，可以再加 C 欄，公式打
-          =GOOGLEFINANCE("TPE:"&A2,"changepct")，標題列打「change」（選填，沒加這欄漲跌會顯示「—」）。接著
-          「檔案 → 共用 → 發布到網路」，只選這個分頁、格式選 CSV，把產生的網址貼在下方。設定後，台股報價一律優先從這裡讀取。
+          Finnhub／Twelve Data 的免費方案都不保證能查到台股（TWSE）即時報價。這裡改用「每日資產數據」GAS 自己維護的
+          「股價歷史」分頁（symbol／date／close）當免費資料來源——同一份資料，不用另外再開一個 GOOGLEFINANCE
+          即時公式的分頁：那種公式只有 Sheet 被打開或編輯時才會重新計算，長時間沒人開著看就會悄悄停在舊值，看起來
+          像即時報價、其實是死的。股價歷史是排程觸發器主動寫進去的，不依賴 Sheet 有沒有被打開，缺點是只有「收盤價」，
+          不是真正的盤中報價。「檔案 → 共用 → 發布到網路」，只選「股價歷史」這個分頁、格式選 CSV，把產生的網址貼在
+          下方。設定後，台股報價一律優先從這裡讀取。
         </p>
         <div className="settings-row">
           <input
             type="text"
             placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
-            value={settings.twQuoteSheetUrl}
-            onChange={(e) => setSettings({ twQuoteSheetUrl: e.target.value })}
+            value={settings.priceHistorySheetUrl}
+            onChange={(e) => setSettings({ priceHistorySheetUrl: e.target.value })}
           />
         </div>
       </div>

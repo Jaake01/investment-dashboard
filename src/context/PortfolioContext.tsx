@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: Settings = {
   priceProvider: 'none',
   finnhubApiKey: '',
   twelveDataApiKey: '',
-  twQuoteSheetUrl: '',
+  priceHistorySheetUrl: '',
   cashLedgerSheetUrl: '',
   dailyAssetSheetUrl: '',
   theme: 'system',
@@ -58,7 +58,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [storedSettings, setSettingsState] = useLocalStorage<Settings>(storageKey('settings'), DEFAULT_SETTINGS);
   // Merge with defaults on every read: localStorage may hold a Settings object
   // saved by an older version of the app that's missing fields added since
-  // (e.g. twQuoteSheetUrl) — reading those as `undefined` instead of '' broke
+  // (e.g. priceHistorySheetUrl) — reading those as `undefined` instead of '' broke
   // every `.trim()` call on them. This self-heals regardless of what's stored.
   const settings = useMemo<Settings>(() => {
     // One-time migration: versions before the per-provider key split stored a

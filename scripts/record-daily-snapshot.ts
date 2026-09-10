@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fetchAndParseSheet } from '../src/lib/csv';
 import { fetchTwelveDataQuote } from '../src/lib/priceProviders/twelvedata';
-import { fetchQuoteSheet, type TwQuote } from '../src/lib/quoteSheet';
+import { fetchPriceHistorySheet, lookupQuote, type TwQuote } from '../src/lib/priceHistorySheet';
 import {
   computeClassCostValues,
   computeClassValues,
@@ -23,7 +23,7 @@ import { DEFAULT_SHEET_URL } from '../src/lib/config';
 import type { Holding, PriceEntry, Snapshot } from '../src/types';
 
 const SHEET_URL = process.env.SNAPSHOT_SHEET_URL?.trim() || DEFAULT_SHEET_URL;
-const TW_QUOTE_SHEET_URL = process.env.SNAPSHOT_TW_QUOTE_SHEET_URL?.trim();
+const PRICE_HISTORY_SHEET_URL = process.env.SNAPSHOT_PRICE_HISTORY_SHEET_URL?.trim();
 const API_KEY = process.env.TWELVEDATA_API_KEY?.trim();
 const OUTPUT_PATH = fileURLToPath(new URL('../public/snapshots.json', import.meta.url));
 // Twelve Data's free tier rate limit — matches the delay usePrices.ts uses in the browser.
@@ -53,22 +53,22 @@ async function main() {
   const prices: Record<string, PriceEntry> = {};
   const symbols = Array.from(new Set(holdings.map((h) => h.symbol.trim()).filter(Boolean)));
 
-  // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for
+  // TW quotes via the GAS-maintained 股價歷史 Sheet take priority for
   // tw_stock holdings — Twelve Data's free tier doesn't reliably cover
   // TWSE. Mirrors the same fallback usePrices.ts uses in the browser.
   let twQuotes: Record<string, TwQuote> = {};
-  if (TW_QUOTE_SHEET_URL) {
+  if (PRICE_HISTORY_SHEET_URL) {
     try {
-      twQuotes = await fetchQuoteSheet(TW_QUOTE_SHEET_URL);
+      twQuotes = await fetchPriceHistorySheet(PRICE_HISTORY_SHEET_URL);
     } catch (err) {
-      console.error('TW quote sheet fetch failed:', err instanceof Error ? err.message : err);
+      console.error('Price history sheet fetch failed:', err instanceof Error ? err.message : err);
     }
   }
 
   const remainingSymbols: string[] = [];
   for (const symbol of symbols) {
     const holding = holdings.find((h) => h.symbol.trim() === symbol);
-    const quote = twQuotes[symbol];
+    const quote = lookupQuote(twQuotes, symbol);
     if (holding?.assetClass === 'tw_stock' && quote !== undefined) {
       prices[symbol] = { symbol, price: quote.price, changePercent: quote.changePercent, updatedAt: new Date().toISOString() };
     } else {

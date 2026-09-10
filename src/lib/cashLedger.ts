@@ -69,7 +69,7 @@ export interface CashLedgerEntry {
 // negative, 賣出入帳/初始餘額 rows are positive, so summing D by currency
 // (B) directly yields the current balance per currency. Rows missing a
 // currency or a parseable amount are skipped rather than failing the whole
-// import, matching fetchQuoteSheet's leniency for this kind of read-only
+// import, matching fetchPriceHistorySheet's leniency for this kind of read-only
 // informational sheet.
 export function parseCashLedgerCsv(csvText: string): CashLedgerEntry[] {
   const result = Papa.parse<Record<string, string>>(csvText, {

@@ -12,7 +12,7 @@ import {
 } from '../lib/calculations';
 import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { CsvImportError } from '../lib/csv';
-import { fetchQuoteSheet } from '../lib/quoteSheet';
+import { fetchPriceHistorySheet, lookupQuote } from '../lib/priceHistorySheet';
 import { useFxRate } from './useFxRate';
 import { activeApiKeyFor, type PriceEntry } from '../types';
 
@@ -96,18 +96,18 @@ export function usePrices() {
     const fetchedEntries: PriceEntry[] = [];
     const fetchErrors: string[] = [];
 
-    // TW quotes via a Google Sheet GOOGLEFINANCE tab take priority for any
+    // TW quotes via the GAS-maintained 股價歷史 Sheet take priority for any
     // symbol it covers — Finnhub/Twelve Data's free tiers don't reliably
     // cover TWSE. Matched by symbol, not assetClass, since a TW high-dividend
     // ETF/bond fund someone tracks under 現金 instead of 台股 is still the
     // same TW-listed symbol the sheet quotes. Anything the sheet doesn't
     // cover falls through to the provider.
     let remainingSymbols = staleSymbols;
-    if (settings.twQuoteSheetUrl.trim()) {
+    if (settings.priceHistorySheetUrl.trim()) {
       try {
-        const twQuotes = await fetchQuoteSheet(settings.twQuoteSheetUrl);
+        const twQuotes = await fetchPriceHistorySheet(settings.priceHistorySheetUrl);
         remainingSymbols = staleSymbols.filter((symbol) => {
-          const quote = twQuotes[symbol];
+          const quote = lookupQuote(twQuotes, symbol);
           if (quote !== undefined) {
             fetchedEntries.push({ symbol, price: quote.price, changePercent: quote.changePercent, updatedAt: new Date().toISOString() });
             return false;
@@ -115,7 +115,7 @@ export function usePrices() {
           return true;
         });
       } catch (err) {
-        fetchErrors.push(err instanceof CsvImportError ? err.message : '台股報價 Sheet 讀取失敗');
+        fetchErrors.push(err instanceof CsvImportError ? err.message : '股價歷史 Sheet 讀取失敗');
       }
     }
 
@@ -123,7 +123,7 @@ export function usePrices() {
       const provider = getProvider(settings.priceProvider);
       const apiKey = activeApiKeyFor(settings);
       if (!provider) {
-        fetchErrors.push('請先在設定中選擇報價來源，或設定台股報價 Sheet');
+        fetchErrors.push('請先在設定中選擇報價來源，或設定股價歷史 Sheet');
       } else if (!apiKey.trim()) {
         fetchErrors.push('請先在設定中輸入 API key');
       } else {
@@ -186,10 +186,10 @@ export function usePrices() {
 
   useEffect(() => {
     const hasProvider = settings.priceProvider !== 'none' && activeApiKeyFor(settings).trim().length > 0;
-    const hasTwSheet = settings.twQuoteSheetUrl.trim().length > 0;
+    const hasTwSheet = settings.priceHistorySheetUrl.trim().length > 0;
     const enabled = (hasProvider || hasTwSheet) && holdings.length > 0;
     const key = enabled
-      ? `${settings.priceProvider}|${activeApiKeyFor(settings)}|${settings.twQuoteSheetUrl}|${holdings.length}`
+      ? `${settings.priceProvider}|${activeApiKeyFor(settings)}|${settings.priceHistorySheetUrl}|${holdings.length}`
       : null;
 
     if (!key) {
@@ -221,7 +221,7 @@ export function usePrices() {
     refreshPrices();
     refreshInterval = setInterval(refreshPrices, AUTO_REFRESH_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.twQuoteSheetUrl, holdings.length]);
+  }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.priceHistorySheetUrl, holdings.length]);
 
   return { refreshPrices, isRefreshing, errors };
 }

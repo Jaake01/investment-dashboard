@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { fetchTwelveDataQuote } from '../lib/priceProviders/twelvedata';
 import { PriceFetchError } from '../lib/priceProviders/errors';
+import { isWithinActiveRefreshWindow, SCHEDULE_CHECK_INTERVAL_MS, SCHEDULED_REFRESH_INTERVAL_MS } from '../lib/refreshSchedule';
 import { activeApiKeyFor } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 5 * 60_000;
-const AUTO_REFRESH_INTERVAL_MS = 30 * 60_000;
 
 // Module-scoped (not per-component), same reasoning and shape as
 // useAutoSync's syncInterval/syncedSheetUrl — one refresh loop shared across
@@ -18,10 +18,23 @@ let refreshingKey: string | null = null;
 // See usePrices.ts's identical activeRefresh/visibilityListenerAttached —
 // same fix, same reasoning: a backgrounded tab still burns Twelve Data's
 // daily credit budget on a schedule nobody's watching. Refocusing only
-// resumes the interval rather than firing an immediate refresh — see
+// resumes the scheduler rather than firing an immediate refresh — see
 // usePrices.ts's handlePricesVisibilityChange for why.
 let activeRefresh: (() => void) | null = null;
 let visibilityListenerAttached = false;
+// See usePrices.ts's identical lastAutoRefreshAt/scheduledRefreshTick — same
+// windowed-hourly schedule (lib/refreshSchedule.ts) so the FX rate doesn't
+// drift out of sync with prices by refreshing on its own separate cadence.
+let lastAutoRefreshAt = 0;
+
+function scheduledRefreshTick() {
+  if (!activeRefresh) return;
+  const now = Date.now();
+  if (!isWithinActiveRefreshWindow(new Date(now))) return;
+  if (now - lastAutoRefreshAt < SCHEDULED_REFRESH_INTERVAL_MS) return;
+  lastAutoRefreshAt = now;
+  activeRefresh();
+}
 
 function handleFxRateVisibilityChange() {
   if (document.visibilityState === 'hidden') {
@@ -32,7 +45,7 @@ function handleFxRateVisibilityChange() {
     return;
   }
   if (!activeRefresh) return;
-  if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
+  if (!refreshInterval) refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
 }
 
 export function useFxRate() {
@@ -103,8 +116,13 @@ export function useFxRate() {
     if (document.visibilityState === 'hidden') return;
 
     const isStale = !fxRate || Date.now() - new Date(fxRate.updatedAt).getTime() > MIN_REFRESH_INTERVAL_MS;
-    if (isStale) refreshFxRate();
-    refreshInterval = setInterval(refreshFxRate, AUTO_REFRESH_INTERVAL_MS);
+    // Same window gate as usePrices.ts's mount effect — don't spend a
+    // refresh just because the tab happened to open outside market hours.
+    if (isStale && isWithinActiveRefreshWindow(new Date())) {
+      lastAutoRefreshAt = Date.now();
+      refreshFxRate();
+    }
+    refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAutoFetch]);
 

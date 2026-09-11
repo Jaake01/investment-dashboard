@@ -49,9 +49,12 @@ let activeRefresh: (() => void) | null = null;
 let visibilityListenerAttached = false;
 
 // A backgrounded tab still burns through Twelve Data's daily credit budget
-// on a schedule nobody's watching — pausing here while hidden, then catching
-// up immediately on refocus, was the fix once we found real usage blowing
-// through the free tier's 800/day limit well before the day was over.
+// on a schedule nobody's watching, so the interval still pauses while
+// hidden. It used to also fire an immediate refresh on refocus ("catch up
+// now that you're looking again"), but that made switching back to the tab
+// feel like it was hammering the API on every glance — refocusing just
+// resumes the regular interval instead, so the next refresh happens on its
+// normal schedule rather than the instant you look back.
 function handlePricesVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     if (refreshInterval) {
@@ -61,7 +64,6 @@ function handlePricesVisibilityChange() {
     return;
   }
   if (!activeRefresh) return;
-  activeRefresh();
   if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
 }
 

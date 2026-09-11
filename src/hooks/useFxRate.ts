@@ -17,7 +17,9 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let refreshingKey: string | null = null;
 // See usePrices.ts's identical activeRefresh/visibilityListenerAttached —
 // same fix, same reasoning: a backgrounded tab still burns Twelve Data's
-// daily credit budget on a schedule nobody's watching.
+// daily credit budget on a schedule nobody's watching. Refocusing only
+// resumes the interval rather than firing an immediate refresh — see
+// usePrices.ts's handlePricesVisibilityChange for why.
 let activeRefresh: (() => void) | null = null;
 let visibilityListenerAttached = false;
 
@@ -30,7 +32,6 @@ function handleFxRateVisibilityChange() {
     return;
   }
   if (!activeRefresh) return;
-  activeRefresh();
   if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
 }
 

@@ -13,11 +13,11 @@ import {
 import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { CsvImportError } from '../lib/csv';
 import { fetchPriceHistorySheet, lookupQuote } from '../lib/priceHistorySheet';
+import { isWithinActiveRefreshWindow, SCHEDULE_CHECK_INTERVAL_MS, SCHEDULED_REFRESH_INTERVAL_MS } from '../lib/refreshSchedule';
 import { useFxRate } from './useFxRate';
 import { activeApiKeyFor, type PriceEntry } from '../types';
 
 const MIN_REFRESH_INTERVAL_MS = 60_000;
-const AUTO_REFRESH_INTERVAL_MS = 30 * 60_000;
 // Twelve Data paces itself internally now (see the shared throttle in
 // lib/priceProviders/twelvedata.ts, which also covers useFxRate's calls) —
 // pacing it again here on top of that would just double the wait for no
@@ -47,11 +47,38 @@ let refreshingKey: string | null = null;
 // listener.
 let activeRefresh: (() => void) | null = null;
 let visibilityListenerAttached = false;
+// When the scheduler last actually called activeRefresh (not just checked
+// whether it should). Module-scoped like the rest of this file's timer
+// state — resets to 0 on a full page reload, which is fine: if that reload
+// happens inside an active window, the next scheduler tick just refreshes
+// right away instead of waiting out a stale hour-old timestamp.
+let lastAutoRefreshAt = 0;
+
+// Ticks every SCHEDULE_CHECK_INTERVAL_MS (cheap — just a clock check, no
+// API calls) and only actually calls activeRefresh once both: we're inside
+// one of the active hours (see lib/refreshSchedule.ts — TW market hours
+// plus the US evening session) and it's been at least
+// SCHEDULED_REFRESH_INTERVAL_MS since the last real refresh. Replaced a
+// flat "refresh every 30 minutes all day" interval that kept burning
+// Twelve Data credits long after trading hours, on the assumption that
+// nobody's actually watching prices move outside those windows anyway.
+function scheduledRefreshTick() {
+  if (!activeRefresh) return;
+  const now = Date.now();
+  if (!isWithinActiveRefreshWindow(new Date(now))) return;
+  if (now - lastAutoRefreshAt < SCHEDULED_REFRESH_INTERVAL_MS) return;
+  lastAutoRefreshAt = now;
+  activeRefresh();
+}
 
 // A backgrounded tab still burns through Twelve Data's daily credit budget
-// on a schedule nobody's watching — pausing here while hidden, then catching
-// up immediately on refocus, was the fix once we found real usage blowing
-// through the free tier's 800/day limit well before the day was over.
+// on a schedule nobody's watching, so the interval still pauses while
+// hidden. It used to also fire an immediate refresh on refocus ("catch up
+// now that you're looking again"), but that made switching back to the tab
+// feel like it was hammering the API on every glance — refocusing just
+// resumes the scheduler instead, so the next refresh happens on its normal
+// schedule (still gated by the active window) rather than the instant you
+// look back.
 function handlePricesVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     if (refreshInterval) {
@@ -61,8 +88,7 @@ function handlePricesVisibilityChange() {
     return;
   }
   if (!activeRefresh) return;
-  activeRefresh();
-  if (!refreshInterval) refreshInterval = setInterval(activeRefresh, AUTO_REFRESH_INTERVAL_MS);
+  if (!refreshInterval) refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
 }
 
 export function usePrices() {
@@ -218,8 +244,17 @@ export function usePrices() {
     // visible, instead of spending credits on a tab nobody's watching.
     if (document.visibilityState === 'hidden') return;
 
-    refreshPrices();
-    refreshInterval = setInterval(refreshPrices, AUTO_REFRESH_INTERVAL_MS);
+    // Only auto-refresh right away if we're actually inside an active
+    // window — landing on the page at, say, 3pm shouldn't immediately spend
+    // a refresh just because the tab opened; it should wait for 9pm like
+    // any other scheduled tick would. The manual "立即刷新報價" button
+    // (SettingsPanel) calls refreshPrices directly and isn't affected by
+    // this gate — it always refreshes regardless of the window.
+    if (isWithinActiveRefreshWindow(new Date())) {
+      lastAutoRefreshAt = Date.now();
+      refreshPrices();
+    }
+    refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.priceHistorySheetUrl, holdings.length]);
 

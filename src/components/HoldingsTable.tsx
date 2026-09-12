@@ -51,7 +51,11 @@ function Money({
   const text = signed ? formatSignedNumber(value) : tiered ? formatTiered(value) : formatAmount(value);
   return (
     <span className={cellClass}>
-      <span className="money-unit">{unit}</span>
+      {/* No unit span at all when there's nothing to show (e.g. 現金 tab's
+          總成本/市值/損益, named once in the column header instead) — an
+          empty span would still claim the cell's `gap`, nudging the number
+          left for no reason. */}
+      {unit && <span className="money-unit">{unit}</span>}
       <span className="money-num">{text}</span>
     </span>
   );
@@ -188,9 +192,11 @@ function buildTabData(
         ? (totals.totalGainLoss / (totals.totalCostValue + cashBalanceTwdTotal)) * 100
         : 0,
   };
-  // 現金 tab totals are normalized to TWD (see computeClassTotals); every
-  // other tab is a plain "$" (see CASH_TAB_UNIT above).
-  const footerUnit = tab === 'cash' ? CASH_TAB_UNIT.TWD : '$';
+  // 現金 tab totals are normalized to TWD (see computeClassTotals), but that's
+  // now named once in the column header ("總成本 (TWD)" etc.) instead of
+  // repeated here too — so this row drops the unit entirely for 現金. Every
+  // other tab keeps its plain "$" (see CASH_TAB_UNIT above).
+  const footerUnit = tab === 'cash' ? '' : '$';
 
   return { metrics, sortedRows, cashBalanceEntries, cashBalanceRows, combinedTotals, footerUnit };
 }
@@ -303,9 +309,12 @@ export function HoldingsTable() {
                             ['change', '漲跌'],
                             ['shares', '數量'],
                             ['avgCost', '平均價格'],
-                            ['costValue', '總成本'],
-                            ['marketValue', '市值'],
-                            ['gainLoss', '損益'],
+                            // 現金 tab 的總成本/市值/損益一律是台幣換算後的數字（見
+                            // displayUnit），每一列重複印「TW$」沒有意義，改成寫在
+                            // 標題列一次；其他分頁本來就是單一幣別，維持原樣不動。
+                            ['costValue', tab === 'cash' ? '總成本 (TWD)' : '總成本'],
+                            ['marketValue', tab === 'cash' ? '市值 (TWD)' : '市值'],
+                            ['gainLoss', tab === 'cash' ? '損益 (TWD)' : '損益'],
                             ['gainLossPct', '損益率'],
                           ] as [SortKey, string][]
                         ).map(([key, label]) => (
@@ -329,8 +338,11 @@ export function HoldingsTable() {
                           <td>—</td>
                           <td><Money unit={CASH_TAB_UNIT[currency] ?? currency} value={amount} alignUnit /></td>
                           <td>—</td>
-                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} alignUnit /></td>
-                          <td><Money unit={CASH_TAB_UNIT.TWD} value={twdValue} alignUnit /></td>
+                          {/* Unit dropped here — 總成本/市值 are always the TWD
+                              equivalent in this tab, now named in the column
+                              header instead of repeated on every row. */}
+                          <td><Money unit="" value={twdValue} /></td>
+                          <td><Money unit="" value={twdValue} /></td>
                           {/* A ledger balance has no 現價, so — like that column — 損益/
                               損益率 read as "not applicable" rather than a computed "0",
                               which would wrongly imply a real gain/loss calculation ran. */}
@@ -348,6 +360,12 @@ export function HoldingsTable() {
                         // equivalent above (see the Row interface), so their 總成本/
                         // 市值/損益 columns get the TWD label instead of the native one.
                         const displayUnit = isForeignCash ? CASH_TAB_UNIT.TWD : nativeUnit;
+                        // In the 現金 tab, 總成本/市值/損益 are always the TWD
+                        // equivalent (see displayUnit above) — that's now named
+                        // once in the column header instead of on every row, so
+                        // these three cells drop the per-row unit entirely. Other
+                        // tabs are unaffected (still a plain "$" per row).
+                        const totalsUnit = tab === 'cash' ? '' : displayUnit;
                         return (
                           <tr key={m.holding.id}>
                             <td>{m.holding.symbol || '—'}</td>
@@ -357,10 +375,10 @@ export function HoldingsTable() {
                             </td>
                             <td>{formatShares(m.holding.shares, m.holding.assetClass)}</td>
                             <td><Money unit={nativeUnit} value={m.holding.avgCost} tiered /></td>
-                            <td><Money unit={displayUnit} value={displayCostValue} alignUnit={tab === 'cash'} /></td>
-                            <td><Money unit={displayUnit} value={displayMarketValue} alignUnit={tab === 'cash'} /></td>
+                            <td><Money unit={totalsUnit} value={displayCostValue} /></td>
+                            <td><Money unit={totalsUnit} value={displayMarketValue} /></td>
                             <td className={isGain ? 'change-up' : 'change-down'}>
-                              <Money unit={displayUnit} value={displayGainLoss} signed alignUnit={tab === 'cash'} />
+                              <Money unit={totalsUnit} value={displayGainLoss} signed />
                             </td>
                             <td className={isGain ? 'change-up' : 'change-down'}>{formatPercent(m.gainLossPct)}</td>
                             <td className="row-actions">
@@ -434,10 +452,10 @@ export function HoldingsTable() {
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
-                        <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} alignUnit={tab === 'cash'} /></td>
-                        <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} alignUnit={tab === 'cash'} /></td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalCostValue} /></td>
+                        <td><Money unit={footerUnit} value={combinedTotals.totalMarketValue} /></td>
                         <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
-                          <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed alignUnit={tab === 'cash'} />
+                          <Money unit={footerUnit} value={combinedTotals.totalGainLoss} signed />
                         </td>
                         <td className={combinedTotals.totalGainLoss >= 0 ? 'change-up' : 'change-down'}>
                           {formatPercent(combinedTotals.totalGainLossPct)}

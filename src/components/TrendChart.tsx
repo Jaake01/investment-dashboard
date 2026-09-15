@@ -203,7 +203,13 @@ export function TrendChart() {
           <LineChart data={gainPoints}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="date" stroke="var(--text-muted)" interval={tickInterval} />
-            <YAxis tickFormatter={(v: number) => formatPercent(v)} width={70} stroke="var(--text-muted)" />
+            {/* Same width as the chart above's YAxis (90) — not this axis's
+                own narrower content ("+27.0%" needs far less). Different
+                widths would shift each chart's plot area by a different
+                amount, so the same date wouldn't land at the same X pixel
+                in both charts even though they share the same `dates` and
+                tickInterval — the whole reason for stacking them here. */}
+            <YAxis tickFormatter={(v: number) => formatPercent(v)} width={90} stroke="var(--text-muted)" />
             <Tooltip formatter={(value) => (value === null ? '無資料' : formatPercent(Number(value)))} />
             <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="3 3" />
             <Line

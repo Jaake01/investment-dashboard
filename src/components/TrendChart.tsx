@@ -119,6 +119,7 @@ export function TrendChart() {
   // the last month is what actually gets looked at day to day.
   const [range, setRange] = useState<RangeDays>(30);
   const gradientId = useId();
+  const gainGradientId = useId();
 
   const currency = series === 'total' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[series];
   const dates = computeDateRange(snapshots, range);
@@ -126,6 +127,19 @@ export function TrendChart() {
   const gainPoints = buildGainPoints(snapshots, dates);
   const validPointCount = points.filter((p) => p.value !== null).length;
   const validGainCount = gainPoints.filter((p) => p.gainPct !== null).length;
+  // Taiwan market convention: red above zero, green below (see .change-up/
+  // .change-down elsewhere in the app) — applied to the line itself via a
+  // vertical gradient that switches color exactly at the y=0 crossing,
+  // rather than a single fixed color for the whole line. `gainMax`/`gainMin`
+  // both fold in 0 itself, so an all-positive or all-negative range still
+  // produces a valid split (entirely red, or entirely green) instead of
+  // dividing by zero — and the YAxis domain below is set to this same
+  // [gainMin, gainMax] range so the gradient's stop position always lands
+  // exactly on the chart's own zero line, however the range is filtered.
+  const gainValues = gainPoints.map((p) => p.gainPct).filter((v): v is number => v !== null);
+  const gainMax = gainValues.length ? Math.max(...gainValues, 0) : 0;
+  const gainMin = gainValues.length ? Math.min(...gainValues, 0) : 0;
+  const gainZeroOffset = gainMax === gainMin ? 0.5 : gainMax / (gainMax - gainMin);
   // Same tick spacing for both charts (they share the same `dates` array),
   // so their X axis ticks land in the same place even though only the
   // bottom chart actually draws its labels.
@@ -185,7 +199,7 @@ export function TrendChart() {
               dataKey="value"
               name={series === 'total' ? '總資產' : ASSET_CLASS_LABELS[series]}
               stroke="var(--accent)"
-              strokeWidth={2}
+              strokeWidth={3}
               fill={`url(#${gradientId})`}
               connectNulls={false}
               dot={false}
@@ -201,6 +215,16 @@ export function TrendChart() {
       ) : (
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={gainPoints}>
+            <defs>
+              {/* Switches the line's own color exactly at the y=0 crossing
+                  (see gainZeroOffset above) — red above zero, green below,
+                  Taiwan market convention (same colors as .change-up/
+                  .change-down elsewhere in the app). */}
+              <linearGradient id={gainGradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset={gainZeroOffset} stopColor="var(--loss)" />
+                <stop offset={gainZeroOffset} stopColor="var(--gain)" />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="date" stroke="var(--text-muted)" interval={tickInterval} />
             {/* Same width as the chart above's YAxis (90) — not this axis's
@@ -209,15 +233,15 @@ export function TrendChart() {
                 amount, so the same date wouldn't land at the same X pixel
                 in both charts even though they share the same `dates` and
                 tickInterval — the whole reason for stacking them here. */}
-            <YAxis tickFormatter={(v: number) => formatPercent(v)} width={90} stroke="var(--text-muted)" />
+            <YAxis tickFormatter={(v: number) => formatPercent(v)} width={90} stroke="var(--text-muted)" domain={[gainMin, gainMax]} />
             <Tooltip formatter={(value) => (value === null ? '無資料' : formatPercent(Number(value)))} />
             <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="3 3" />
             <Line
               type="monotone"
               dataKey="gainPct"
               name="美股損益%"
-              stroke="var(--accent)"
-              strokeWidth={2}
+              stroke={`url(#${gainGradientId})`}
+              strokeWidth={3}
               dot={false}
               connectNulls={false}
               isAnimationActive={false}

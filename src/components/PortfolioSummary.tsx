@@ -1,7 +1,5 @@
 import { usePortfolio } from '../context/PortfolioContext';
 import { useFxRate } from '../hooks/useFxRate';
-import { usePrices } from '../hooks/usePrices';
-import { useCashLedger } from '../hooks/useCashLedger';
 import {
   computeDayChangeInGainPct,
   computeHoldingMetrics,
@@ -22,35 +20,8 @@ function addTwd(base: number | null, delta: number): number | null {
 
 export function PortfolioSummary() {
   const { holdings, prices, snapshots, cashBalances } = usePortfolio();
-  const {
-    effectiveUsdToTwd,
-    effectiveJpyToTwd,
-    refreshFxRate,
-    canAutoFetch: canAutoFetchFx,
-    updatedAt: fxUpdatedAt,
-    isRefreshing: isFxRefreshing,
-  } = useFxRate();
-  const { refreshPrices, isRefreshing } = usePrices();
-  const { refreshCashLedger, isRefreshing: isCashLedgerRefreshing } = useCashLedger();
+  const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
   const metrics = holdings.map((h) => computeHoldingMetrics(h, prices));
-
-  const isAnyRefreshing = isRefreshing || isFxRefreshing || isCashLedgerRefreshing;
-
-  const handleRefreshAll = async () => {
-    await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve(), refreshCashLedger()]);
-  };
-
-  // "最後刷新時間" — the most recent of any price entry's own timestamp
-  // (see usePrices.ts's applyPriceUpdates) and the FX rate's, rather than a
-  // separate tracked field: this already reflects both the windowed
-  // auto-refresh (see lib/refreshSchedule.ts) and manual refreshes, and
-  // (unlike a timestamp set only here) survives a page reload since prices/
-  // fxRate are themselves persisted to localStorage.
-  const priceTimestamps = Object.values(prices)
-    .map((p) => new Date(p.updatedAt).getTime())
-    .filter((t) => Number.isFinite(t));
-  const lastRefreshedMs = Math.max(...priceTimestamps, fxUpdatedAt ? new Date(fxUpdatedAt).getTime() : -Infinity);
-  const lastRefreshedLabel = Number.isFinite(lastRefreshedMs) ? new Date(lastRefreshedMs).toLocaleTimeString('zh-TW') : null;
 
   // Cash-ledger balances (see CashLedgerCard) aren't Holdings, so they don't
   // flow through computeTotalInTwd/computeTotalCostInTwd — added on top here
@@ -78,20 +49,7 @@ export function PortfolioSummary() {
 
   return (
     <section className="card summary-card">
-      <div className="card-header">
-        <h2>投資組合總覽（換算台幣）</h2>
-        <div className="card-header-controls">
-          {/* Moved here from 設定 so it's visible without leaving 總覽 —
-              same combined refresh (報價/匯率/現金帳戶) SettingsPanel's
-              button used to trigger. */}
-          <span className="last-refreshed-label">
-            {lastRefreshedLabel ? `最後刷新：${lastRefreshedLabel}` : '尚未刷新過'}
-          </span>
-          <button className="btn btn-primary" onClick={handleRefreshAll} disabled={isAnyRefreshing}>
-            {isAnyRefreshing ? '刷新中…' : '立即刷新報價'}
-          </button>
-        </div>
-      </div>
+      <h2>投資組合總覽（換算台幣）</h2>
       <div className="summary-grid">
         <div className="summary-stat">
           {/* "總資產" (not 總市值) because this includes 現金帳戶 ledger

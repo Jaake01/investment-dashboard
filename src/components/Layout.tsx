@@ -6,6 +6,7 @@ import { AllocationBubbleChart } from './AllocationBubbleChart';
 import { HoldingsTable } from './HoldingsTable';
 import { TrendChart } from './TrendChart';
 import { RealizedGains } from './RealizedGains';
+import { RefreshControl } from './RefreshControl';
 import { SettingsPanel } from './SettingsPanel';
 import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
@@ -45,27 +46,32 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>投資儀表板</h1>
-        <nav className="tab-bar app-header-tabs">
-          <button
-            className={`tab-button ${page === 'overview' ? 'active' : ''}`}
-            onClick={() => setPage('overview')}
-          >
-            總覽
-          </button>
-          <button
-            className={`tab-button ${page === 'realized' ? 'active' : ''}`}
-            onClick={() => setPage('realized')}
-          >
-            已實現損益
-          </button>
-          <button
-            className={`tab-button ${page === 'settings' ? 'active' : ''}`}
-            onClick={() => setPage('settings')}
-          >
-            設定
-          </button>
-        </nav>
+        <div className="app-header-main">
+          <h1>投資儀表板</h1>
+          <nav className="tab-bar app-header-tabs">
+            <button
+              className={`tab-button ${page === 'overview' ? 'active' : ''}`}
+              onClick={() => setPage('overview')}
+            >
+              總覽
+            </button>
+            <button
+              className={`tab-button ${page === 'realized' ? 'active' : ''}`}
+              onClick={() => setPage('realized')}
+            >
+              已實現損益
+            </button>
+            <button
+              className={`tab-button ${page === 'settings' ? 'active' : ''}`}
+              onClick={() => setPage('settings')}
+            >
+              設定
+            </button>
+          </nav>
+        </div>
+        {/* Visible on every page (not just 總覽) — refreshing prices isn't
+            tied to whichever tab happens to be open. */}
+        <RefreshControl />
       </header>
       <main className="app-main">
         {page === 'overview' && (

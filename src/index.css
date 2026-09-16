@@ -116,6 +116,11 @@ h3 {
 }
 
 .app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--card-bg);
@@ -123,6 +128,16 @@ h3 {
 
 .app-header-tabs {
   margin: 10px 0 0;
+}
+
+/* Button on top, "最後刷新" underneath, right-aligned as a block — sits on
+   the right of .app-header, opposite the title/tabs (see RefreshControl.tsx).
+   Visible on every page, not just 總覽, since refreshing isn't tab-specific. */
+.refresh-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .theme-toggle {
@@ -145,9 +160,9 @@ h3 {
   flex-wrap: wrap;
 }
 
-/* "最後刷新：14:23" next to PortfolioSummary's refresh button — same muted
-   tone as .settings-hint, but without its block margins (this one sits
-   inline in a .card-header-controls flex row, not its own paragraph). */
+/* "最後刷新：14:23" under RefreshControl's button — same muted tone as
+   .settings-hint, but without its block margins (this sits in a flex
+   column, not its own paragraph). */
 .last-refreshed-label {
   font-size: 13px;
   color: var(--text-muted);

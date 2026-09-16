@@ -3,6 +3,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  LabelList,
   Line,
   LineChart,
   ReferenceLine,
@@ -36,6 +37,14 @@ function addDaysStr(dateStr: string, days: number): string {
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86_400_000);
+}
+
+// "2026-08-27" -> "8/27" — the year is implied (these charts never span
+// more than a year) and just adds noise to an axis that's already tight on
+// horizontal space for ~8 tick labels.
+function formatShortDate(dateStr: string): string {
+  const [, month, day] = dateStr.split('-');
+  return `${Number(month)}/${Number(day)}`;
 }
 
 interface TrendPoint {
@@ -146,6 +155,14 @@ export function TrendChart() {
   // so their X axis ticks land in the same place even though only the
   // bottom chart actually draws its labels.
   const tickInterval = Math.max(0, Math.ceil(dates.length / 8) - 1);
+  // Value labels on the gain chart itself, shown at the same ~8 points as
+  // the X axis ticks (labelStep matches tickInterval) rather than on every
+  // point, which at 30+ days would overlap into an unreadable smear.
+  const labelStep = tickInterval + 1;
+  const gainChartData = gainPoints.map((p, i) => ({
+    ...p,
+    labelText: p.gainPct !== null && i % labelStep === 0 ? formatPercent(p.gainPct) : '',
+  }));
 
   return (
     <section className="card">
@@ -195,7 +212,10 @@ export function TrendChart() {
                 same row of dates twice. */}
             <XAxis dataKey="date" stroke="var(--text-muted)" interval={tickInterval} tick={false} axisLine={false} tickLine={false} />
             <YAxis tickFormatter={(v: number) => formatCurrencyIn(v, currency)} width={90} stroke="var(--text-muted)" domain={['auto', 'auto']} />
-            <Tooltip formatter={(value) => (value === null ? '無資料' : formatCurrencyIn(Number(value), currency))} />
+            <Tooltip
+              labelFormatter={(label) => formatShortDate(String(label))}
+              formatter={(value) => (value === null ? '無資料' : formatCurrencyIn(Number(value), currency))}
+            />
             <Area
               type="monotone"
               dataKey="value"
@@ -216,7 +236,7 @@ export function TrendChart() {
         <p className="empty-state">刷新報價後會記錄每日損益%快照，累積至少 2 筆這個類別的資料即可看到走勢圖。</p>
       ) : (
         <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={gainPoints}>
+          <LineChart data={gainChartData}>
             <defs>
               {/* Switches the line's own color exactly at the y=0 crossing
                   (see gainZeroOffset above) — red above zero, green below,
@@ -228,7 +248,7 @@ export function TrendChart() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="date" stroke="var(--text-muted)" interval={tickInterval} />
+            <XAxis dataKey="date" stroke="var(--text-muted)" interval={tickInterval} tickFormatter={formatShortDate} />
             {/* Same width as the chart above's YAxis (90) — not this axis's
                 own narrower content ("+27.0%" needs far less). Different
                 widths would shift each chart's plot area by a different
@@ -236,7 +256,10 @@ export function TrendChart() {
                 in both charts even though they share the same `dates` and
                 tickInterval — the whole reason for stacking them here. */}
             <YAxis tickFormatter={(v: number) => formatPercent(v)} width={90} stroke="var(--text-muted)" domain={[gainMin, gainMax]} />
-            <Tooltip formatter={(value) => (value === null ? '無資料' : formatPercent(Number(value)))} />
+            <Tooltip
+              labelFormatter={(label) => formatShortDate(String(label))}
+              formatter={(value) => (value === null ? '無資料' : formatPercent(Number(value)))}
+            />
             <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="3 3" />
             <Line
               type="monotone"
@@ -247,7 +270,9 @@ export function TrendChart() {
               dot={false}
               connectNulls={false}
               isAnimationActive={false}
-            />
+            >
+              <LabelList dataKey="labelText" position="top" style={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+            </Line>
           </LineChart>
         </ResponsiveContainer>
       )}

@@ -16,7 +16,7 @@ export function RefreshControl() {
   const isAnyRefreshing = isRefreshing || isFxRefreshing || isCashLedgerRefreshing;
 
   const handleRefreshAll = async () => {
-    await Promise.all([refreshPrices(), canAutoFetchFx ? refreshFxRate() : Promise.resolve(), refreshCashLedger()]);
+    await Promise.all([refreshPrices(true), canAutoFetchFx ? refreshFxRate() : Promise.resolve(), refreshCashLedger()]);
   };
 
   // "最後刷新時間" — the most recent of any price entry's own timestamp

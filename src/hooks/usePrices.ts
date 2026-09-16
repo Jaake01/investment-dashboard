@@ -97,7 +97,13 @@ export function usePrices() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const refreshPrices = async () => {
+  // `force` skips the MIN_REFRESH_INTERVAL_MS staleness gate below — used by
+  // the manual "立即刷新報價" button (RefreshControl), so clicking it always
+  // fetches every symbol right away instead of silently no-oping (and
+  // leaving 最後刷新 looking frozen) whenever a scheduled refresh happened to
+  // run within the last minute. The scheduled/mount-triggered calls above
+  // keep the default (gated) behavior.
+  const refreshPrices = async (force = false) => {
     const now = Date.now();
     const staleSymbols = Array.from(
       new Set(
@@ -105,6 +111,7 @@ export function usePrices() {
           .map((h) => h.symbol.trim())
           .filter((symbol) => symbol.length > 0)
           .filter((symbol) => {
+            if (force) return true;
             const cached = prices[symbol];
             if (!cached) return true;
             return now - new Date(cached.updatedAt).getTime() > MIN_REFRESH_INTERVAL_MS;

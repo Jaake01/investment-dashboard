@@ -26,27 +26,18 @@ export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, setTransactions, syncStatus, syncError } =
     usePortfolio();
   const { user, loading: authLoading, signInError, signInWithGoogle, signOutUser } = useAuth();
-  const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
-  const {
-    refreshFxRate,
-    isRefreshing: isFxRefreshing,
-    error: fxError,
-    canAutoFetch: canAutoFetchFx,
-    effectiveUsdToTwd,
-    effectiveJpyToTwd,
-    updatedAt: fxUpdatedAt,
-  } = useFxRate();
+  // refreshPrices/refreshFxRate/refreshCashLedger themselves aren't called
+  // from here anymore — the combined "立即刷新報價" button moved to
+  // PortfolioSummary (see its own handleRefreshAll) so it's visible on 總覽
+  // without opening 設定. These hooks are still mounted here for their
+  // status/error display below (priceErrors, fxError, cashLedgerError) and
+  // to dedupe their background auto-refresh loop across every mounted
+  // instance (see Layout.tsx's comment on the same hooks).
+  const { errors: priceErrors } = usePrices();
+  const { error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, effectiveJpyToTwd, updatedAt: fxUpdatedAt } = useFxRate();
   const { error: autoSyncError } = useAutoSync();
-  const { refreshCashLedger, isRefreshing: isCashLedgerRefreshing, error: cashLedgerError } = useCashLedger();
+  const { error: cashLedgerError } = useCashLedger();
   const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
-
-  const handleRefreshAll = async () => {
-    await Promise.all([
-      refreshPrices(),
-      canAutoFetchFx ? refreshFxRate() : Promise.resolve(),
-      refreshCashLedger(),
-    ]);
-  };
 
   const [importError, setImportError] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -194,16 +185,9 @@ export function SettingsPanel() {
               else if (settings.priceProvider === 'twelvedata') setSettings({ twelveDataApiKey: e.target.value });
             }}
           />
-          <button
-            className="btn btn-primary"
-            onClick={handleRefreshAll}
-            disabled={isRefreshing || isFxRefreshing || isCashLedgerRefreshing}
-          >
-            {isRefreshing || isFxRefreshing || isCashLedgerRefreshing ? '刷新中…' : '立即刷新報價'}
-          </button>
         </div>
         <p className="settings-hint">
-          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。選擇 Twelve Data 時，這顆按鈕也會一併刷新美元/台幣、日圓/台幣匯率；有設定現金帳戶 Sheet 網址時也會一併重新讀取現金餘額。
+          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。「立即刷新報價」按鈕移到「總覽」頁上方了——選擇 Twelve Data 時，那顆按鈕也會一併刷新美元/台幣、日圓/台幣匯率；有設定現金帳戶 Sheet 網址時也會一併重新讀取現金餘額。
         </p>
         {priceErrors.length > 0 && (
           <ul className="form-error-list">

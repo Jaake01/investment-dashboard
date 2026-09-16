@@ -116,23 +116,30 @@ h3 {
 }
 
 .app-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--card-bg);
 }
 
-.app-header-tabs {
-  margin: 10px 0 0;
+/* Tab buttons (left) and RefreshControl (right) as siblings in the same
+   row, so the refresh button lines up with the tab buttons — not with the
+   "投資儀表板" title above (see Layout.tsx). */
+.app-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
 }
 
-/* Button on top, "最後刷新" underneath, right-aligned as a block — sits on
-   the right of .app-header, opposite the title/tabs (see RefreshControl.tsx).
-   Visible on every page, not just 總覽, since refreshing isn't tab-specific. */
+.app-header-tabs {
+  margin: 0;
+}
+
+/* Button on top, "最後刷新" underneath, right-aligned as a block (see
+   RefreshControl.tsx). Visible on every page, not just 總覽, since
+   refreshing isn't tab-specific. */
 .refresh-control {
   display: flex;
   flex-direction: column;

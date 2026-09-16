@@ -145,6 +145,15 @@ h3 {
   flex-wrap: wrap;
 }
 
+/* "最後刷新：14:23" next to PortfolioSummary's refresh button — same muted
+   tone as .settings-hint, but without its block margins (this one sits
+   inline in a .card-header-controls flex row, not its own paragraph). */
+.last-refreshed-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .theme-toggle-btn {
   border: none;
   background: none;

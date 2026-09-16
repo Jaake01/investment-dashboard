@@ -209,7 +209,7 @@ export function TrendChart() {
         </ResponsiveContainer>
       )}
 
-      <h3 className="subchart-title">美股損益%走勢</h3>
+      <h3 className="subchart-title">損益走勢</h3>
       {validGainCount < 2 ? (
         <p className="empty-state">刷新報價後會記錄每日美股損益%快照，累積至少 2 筆資料即可看到走勢圖。</p>
       ) : (
@@ -239,7 +239,7 @@ export function TrendChart() {
             <Line
               type="monotone"
               dataKey="gainPct"
-              name="美股損益%"
+              name="損益%"
               stroke={`url(#${gainGradientId})`}
               strokeWidth={3}
               dot={false}

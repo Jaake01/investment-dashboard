@@ -46,8 +46,8 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="app-header-main">
-          <h1>投資儀表板</h1>
+        <h1>投資儀表板</h1>
+        <div className="app-header-row">
           <nav className="tab-bar app-header-tabs">
             <button
               className={`tab-button ${page === 'overview' ? 'active' : ''}`}
@@ -68,10 +68,10 @@ export function Layout() {
               設定
             </button>
           </nav>
+          {/* Same row as the tab buttons (not the title above) — visible on
+              every page, not just 總覽, since refreshing isn't tab-specific. */}
+          <RefreshControl />
         </div>
-        {/* Visible on every page (not just 總覽) — refreshing prices isn't
-            tied to whichever tab happens to be open. */}
-        <RefreshControl />
       </header>
       <main className="app-main">
         {page === 'overview' && (

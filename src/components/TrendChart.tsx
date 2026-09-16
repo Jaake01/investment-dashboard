@@ -50,10 +50,9 @@ interface GainPoint {
 
 // Shared by both stacked charts below, so their X axes always land on the
 // same calendar days — always anchored to 總資產's own date coverage,
-// regardless of which series the dropdown has selected, so switching it
-// never shifts the 美股損益% chart underneath out of alignment. The one
-// trade-off: a date with a valid 美股 reading but a broken 總資產 for that
-// day (e.g. an old Action snapshot with a null total) would be excluded
+// regardless of which series the dropdown has selected. The one trade-off:
+// a date with a valid reading for the selected class but a broken 總資產 for
+// that day (e.g. an old Action snapshot with a null total) would be excluded
 // here and so wouldn't show in either chart — rare in practice, and worth
 // it for the two charts staying visually lined up date-for-date.
 function computeDateRange(snapshots: Snapshot[], range: RangeDays): string[] {
@@ -93,14 +92,16 @@ function buildTrendPoints(snapshots: Snapshot[], series: Series, dates: string[]
 
 // Same "one point per calendar day, null for a gap" treatment as
 // buildTrendPoints — only plots days that actually have both a market value
-// and a cost basis recorded for 美股 (older snapshots from before cost
-// tracking was added won't).
-function buildGainPoints(snapshots: Snapshot[], dates: string[]): GainPoint[] {
+// and a cost basis recorded for the selected series (older snapshots from
+// before cost tracking was added won't). Follows the same series selection
+// as the trend chart above, so switching the dropdown updates both charts
+// together.
+function buildGainPoints(snapshots: Snapshot[], series: Series, dates: string[]): GainPoint[] {
   const gainByDate = new Map<string, number>();
   for (const s of snapshots) {
-    const value = s.classValues?.us_stock;
-    const cost = s.classCostValues?.us_stock;
-    if (value === undefined || cost === undefined) continue;
+    const value = series === 'total' ? s.totalValue : s.classValues?.[series];
+    const cost = series === 'total' ? s.totalCost : s.classCostValues?.[series];
+    if (value === undefined || cost === undefined || !Number.isFinite(value)) continue;
     const gainPct = computeGainPct(value, cost);
     if (gainPct === null) continue;
     gainByDate.set(s.date, gainPct);
@@ -124,7 +125,8 @@ export function TrendChart() {
   const currency = series === 'total' ? 'TWD' : CURRENCY_FOR_ASSET_CLASS[series];
   const dates = computeDateRange(snapshots, range);
   const points = buildTrendPoints(snapshots, series, dates);
-  const gainPoints = buildGainPoints(snapshots, dates);
+  const gainPoints = buildGainPoints(snapshots, series, dates);
+  const gainSeriesLabel = series === 'total' ? '總資產' : ASSET_CLASS_LABELS[series];
   const validPointCount = points.filter((p) => p.value !== null).length;
   const validGainCount = gainPoints.filter((p) => p.gainPct !== null).length;
   // Taiwan market convention: red above zero, green below (see .change-up/
@@ -209,9 +211,9 @@ export function TrendChart() {
         </ResponsiveContainer>
       )}
 
-      <h3 className="subchart-title">損益走勢</h3>
+      <h3 className="subchart-title">{gainSeriesLabel}損益走勢</h3>
       {validGainCount < 2 ? (
-        <p className="empty-state">刷新報價後會記錄每日美股損益%快照，累積至少 2 筆資料即可看到走勢圖。</p>
+        <p className="empty-state">刷新報價後會記錄每日損益%快照，累積至少 2 筆這個類別的資料即可看到走勢圖。</p>
       ) : (
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={gainPoints}>

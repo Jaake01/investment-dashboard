@@ -9,11 +9,22 @@ import { usePortfolio } from '../context/PortfolioContext';
 // SettingsPanel; moved out so it doesn't require opening 設定 first.
 export function RefreshControl() {
   const { prices } = usePortfolio();
-  const { refreshFxRate, canAutoFetch: canAutoFetchFx, updatedAt: fxUpdatedAt, isRefreshing: isFxRefreshing } = useFxRate();
-  const { refreshPrices, isRefreshing } = usePrices();
-  const { refreshCashLedger, isRefreshing: isCashLedgerRefreshing } = useCashLedger();
+  const {
+    refreshFxRate,
+    canAutoFetch: canAutoFetchFx,
+    updatedAt: fxUpdatedAt,
+    isRefreshing: isFxRefreshing,
+    error: fxError,
+  } = useFxRate();
+  const { refreshPrices, isRefreshing, errors: priceErrors } = usePrices();
+  const { refreshCashLedger, isRefreshing: isCashLedgerRefreshing, error: cashLedgerError } = useCashLedger();
 
   const isAnyRefreshing = isRefreshing || isFxRefreshing || isCashLedgerRefreshing;
+  // Surfaced here too (not just in SettingsPanel's status section) — this
+  // button moved out of 設定 into the global header, so a failure needs to be
+  // visible without switching tabs, otherwise a failed refresh looks
+  // identical to a successful one that just returned unchanged prices.
+  const refreshErrors = [...priceErrors, fxError, cashLedgerError].filter((e): e is string => Boolean(e));
 
   const handleRefreshAll = async () => {
     await Promise.all([refreshPrices(true), canAutoFetchFx ? refreshFxRate() : Promise.resolve(), refreshCashLedger()]);
@@ -37,6 +48,11 @@ export function RefreshControl() {
         {isAnyRefreshing ? '刷新中…' : '立即刷新報價'}
       </button>
       <span className="last-refreshed-label">{lastRefreshedLabel ? `最後刷新：${lastRefreshedLabel}` : '尚未刷新過'}</span>
+      {refreshErrors.length > 0 && (
+        <span className="refresh-error-label" title={refreshErrors.join('；')}>
+          刷新失敗（{refreshErrors.length}）－詳見設定頁
+        </span>
+      )}
     </div>
   );
 }

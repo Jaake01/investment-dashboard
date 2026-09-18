@@ -176,6 +176,13 @@ h3 {
   white-space: nowrap;
 }
 
+.refresh-error-label {
+  font-size: 13px;
+  color: var(--loss);
+  white-space: nowrap;
+  cursor: help;
+}
+
 .theme-toggle-btn {
   border: none;
   background: none;

@@ -24,7 +24,11 @@ export function RefreshControl() {
   // button moved out of 設定 into the global header, so a failure needs to be
   // visible without switching tabs, otherwise a failed refresh looks
   // identical to a successful one that just returned unchanged prices.
-  const refreshErrors = [...priceErrors, fxError, cashLedgerError].filter((e): e is string => Boolean(e));
+  // Deduped — a flat-rate-limit failure (see twelvedata.ts's 429 handling)
+  // throws the exact same message for both the price loop and the FX rate
+  // (both hit Twelve Data), which would otherwise double up here even
+  // though priceErrors is already deduped within itself.
+  const refreshErrors = Array.from(new Set([...priceErrors, fxError, cashLedgerError].filter((e): e is string => Boolean(e))));
 
   const handleRefreshAll = async () => {
     await Promise.all([refreshPrices(true), canAutoFetchFx ? refreshFxRate() : Promise.resolve(), refreshCashLedger()]);

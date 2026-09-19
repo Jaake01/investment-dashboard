@@ -83,7 +83,10 @@ export function useFxRate() {
     if (usdToTwd !== undefined) {
       setFxRate({ usdToTwd, jpyToTwd, updatedAt: new Date().toISOString(), source: 'auto' });
     }
-    setError(errors.join('；'));
+    // Deduped — a flat-rate-limit failure (see twelvedata.ts's 429 handling)
+    // throws the exact same message for both pairs, which would otherwise
+    // join into one confusing "msg；msg" string instead of showing once.
+    setError(Array.from(new Set(errors)).join('；'));
     setIsRefreshing(false);
   };
 

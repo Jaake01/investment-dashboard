@@ -213,7 +213,11 @@ export function usePrices() {
       }
     }
 
-    setErrors(fetchErrors);
+    // Deduped — a flat-rate-limit failure (see twelvedata.ts's 429 handling)
+    // throws the exact same message for every stale symbol in this refresh,
+    // which would otherwise show as N near-identical entries instead of one
+    // recognizable line.
+    setErrors(Array.from(new Set(fetchErrors)));
     setIsRefreshing(false);
   };
 

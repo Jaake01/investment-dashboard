@@ -64,6 +64,16 @@ export async function fetchTwelveDataQuote(symbol: string, apiKey: string, asset
   }
   const data = (await response.json()) as TwelveDataQuoteResponse;
   if (!data.close) {
+    // Twelve Data bakes rate-limit errors into a 200 OK response body
+    // (code: 429) instead of the HTTP status, so the `!response.ok` branch
+    // above never catches them. Given one flat rate limit, every stale
+    // symbol in the same refresh hits it and throws this identical message —
+    // usePrices.ts dedupes fetchErrors before displaying them, so this
+    // collapses into a single, recognizable "額度用完" line instead of one
+    // near-duplicate per symbol.
+    if (data.code === 429) {
+      throw new PriceFetchError('Twelve Data 額度已用完（免費方案有每分鐘/每日上限），請稍後再試或減少刷新頻率');
+    }
     throw new PriceFetchError(`${symbol}：${data.message ?? '找不到報價'}`);
   }
   const price = Number(data.close);

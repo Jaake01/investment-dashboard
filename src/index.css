@@ -179,8 +179,8 @@ h3 {
 .refresh-error-label {
   font-size: 13px;
   color: var(--loss);
-  white-space: nowrap;
-  cursor: help;
+  max-width: 320px;
+  text-align: right;
 }
 
 .theme-toggle-btn {

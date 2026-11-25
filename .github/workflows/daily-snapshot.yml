@@ -5,7 +5,10 @@ on:
     # 22:00 UTC — after both the US market close (~20:00-21:00 UTC) and the
     # Taiwan market close (05:30 UTC, earlier the same UTC calendar day), so
     # both markets' snapshot lands under the same date label.
-    - cron: '0 22 * * *'
+    # Off the top of the hour: GitHub delays :00 schedules the most (runs
+    # here were starting 4-7 hours late). The script's date label tolerates
+    # the delay anyway (see snapshotDateLabel).
+    - cron: '17 22 * * *'
   workflow_dispatch:
 
 permissions:
@@ -52,5 +55,5 @@ jobs:
           git rm -rf --cached . > /dev/null
           mv public/snapshots.json ./snapshots.json
           git add -f snapshots.json
-          git commit -m "chore: record daily snapshot ($(date -u +%F))"
+          git commit -m "chore: record daily snapshot ($(date -u -d '-8 hours' +%F))"
           git push origin data-publish:data --force

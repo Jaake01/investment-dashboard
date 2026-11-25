@@ -36,9 +36,7 @@ export function RefreshControl() {
 
   // "最後刷新時間" — the most recent of any price entry's own timestamp
   // (see usePrices.ts's applyPriceUpdates) and the FX rate's, rather than a
-  // separate tracked field: this already reflects both the windowed
-  // auto-refresh (see lib/refreshSchedule.ts) and manual refreshes, and
-  // (unlike a timestamp set only here) survives a page reload since prices/
+  // separate tracked field: (unlike a timestamp set only here) survives a page reload since prices/
   // fxRate are themselves persisted to localStorage.
   const priceTimestamps = Object.values(prices)
     .map((p) => new Date(p.updatedAt).getTime())
@@ -53,9 +51,7 @@ export function RefreshControl() {
       </button>
       <span className="last-refreshed-label">{lastRefreshedLabel ? `最後刷新：${lastRefreshedLabel}` : '尚未刷新過'}</span>
       {refreshErrors.length > 0 && (
-        <span className="refresh-error-label" title={refreshErrors.join('；')}>
-          刷新失敗（{refreshErrors.length}）－詳見設定頁
-        </span>
+        <span className="refresh-error-label">刷新失敗：{refreshErrors.join('；')}</span>
       )}
     </div>
   );

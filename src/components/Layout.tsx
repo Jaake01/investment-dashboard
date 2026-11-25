@@ -8,7 +8,6 @@ import { TrendChart } from './TrendChart';
 import { RealizedGains } from './RealizedGains';
 import { RefreshControl } from './RefreshControl';
 import { SettingsPanel } from './SettingsPanel';
-import { usePrices } from '../hooks/usePrices';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useCashLedger } from '../hooks/useCashLedger';
 import { useRemoteSnapshots } from '../hooks/useRemoteSnapshots';
@@ -21,12 +20,12 @@ export function Layout() {
   const { settings } = usePortfolio();
 
   // Mounted here (not just inside SettingsPanel) so Sheet auto-sync, the
-  // remote daily-snapshot merge, and price auto-refresh all run as soon as
+  // cash-ledger refresh and the remote daily-snapshot merge all run as soon as
   // the app loads, regardless of which tab is open — Layout is always
   // mounted, SettingsPanel isn't. Each hook dedupes its own background
   // behavior across multiple mounted instances, so SettingsPanel can still
-  // call these itself for its manual buttons/status display.
-  usePrices();
+  // call these itself for its status display. Prices/FX are manual-only
+  // (RefreshControl), so usePrices isn't mounted here.
   useAutoSync();
   useCashLedger();
   useRemoteSnapshots();

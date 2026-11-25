@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { isFirebaseConfigured } from '../lib/firebase';
 import { CsvImportError, fetchAndParseSheet } from '../lib/csv';
 import { PRICE_PROVIDERS } from '../lib/priceProviders';
-import { usePrices } from '../hooks/usePrices';
 import { useFxRate } from '../hooks/useFxRate';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useCashLedger } from '../hooks/useCashLedger';
@@ -26,15 +25,10 @@ export function SettingsPanel() {
   const { settings, setSettings, replaceHoldingsFromImport, mergeHoldingsFromImport, setTransactions, syncStatus, syncError } =
     usePortfolio();
   const { user, loading: authLoading, signInError, signInWithGoogle, signOutUser } = useAuth();
-  // refreshPrices/refreshFxRate/refreshCashLedger themselves aren't called
-  // from here anymore — the combined "立即刷新報價" button moved to
-  // PortfolioSummary (see its own handleRefreshAll) so it's visible on 總覽
-  // without opening 設定. These hooks are still mounted here for their
-  // status/error display below (priceErrors, fxError, cashLedgerError) and
-  // to dedupe their background auto-refresh loop across every mounted
-  // instance (see Layout.tsx's comment on the same hooks).
-  const { errors: priceErrors } = usePrices();
-  const { error: fxError, canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, effectiveJpyToTwd, updatedAt: fxUpdatedAt } = useFxRate();
+  // Price/FX refresh is manual-only and lives in RefreshControl (header),
+  // which shows its own errors — this instance of useFxRate is only for the
+  // rate/status display below.
+  const { canAutoFetch: canAutoFetchFx, effectiveUsdToTwd, effectiveJpyToTwd, updatedAt: fxUpdatedAt } = useFxRate();
   const { error: autoSyncError } = useAutoSync();
   const { error: cashLedgerError } = useCashLedger();
   const { lastRemoteDate, checked: remoteChecked } = useRemoteSnapshots();
@@ -187,15 +181,8 @@ export function SettingsPanel() {
           />
         </div>
         <p className="settings-hint">
-          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。「立即刷新報價」按鈕移到「總覽」頁上方了——選擇 Twelve Data 時，那顆按鈕也會一併刷新美元/台幣、日圓/台幣匯率；有設定現金帳戶 Sheet 網址時也會一併重新讀取現金餘額。
+          每個報價來源會分開記住自己的 API key，切換來源不會遺失另一個已經填過的 key。Key 僅儲存在你的瀏覽器 localStorage，不會傳送到除報價來源以外的任何地方。報價、匯率只會在按下頁首的「立即刷新報價」時更新（不會自動刷新）——選擇 Twelve Data 時，那顆按鈕也會一併刷新美元/台幣、日圓/台幣匯率；有設定現金帳戶 Sheet 網址時也會一併重新讀取現金餘額。
         </p>
-        {priceErrors.length > 0 && (
-          <ul className="form-error-list">
-            {priceErrors.map((err) => (
-              <li key={err}>{err}</li>
-            ))}
-          </ul>
-        )}
         {cashLedgerError && <p className="form-error">現金帳戶讀取失敗：{cashLedgerError}</p>}
       </div>
 
@@ -268,7 +255,6 @@ export function SettingsPanel() {
             : `目前：1 JPY = ${effectiveJpyToTwd} TWD（即時 API${fxUpdatedAt ? `，${new Date(fxUpdatedAt).toLocaleTimeString('zh-TW')} 更新` : ''}）`}
           {!canAutoFetchFx && '　需選擇 Twelve Data 並填入 API key 才能取得匯率。'}
         </p>
-        {fxError && <p className="form-error">{fxError}</p>}
       </div>
 
       <div className="settings-group">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { getProvider, PriceFetchError } from '../lib/priceProviders';
 import {
@@ -13,7 +13,6 @@ import {
 import { computeCashLedgerTwdTotal } from '../lib/cashLedger';
 import { CsvImportError } from '../lib/csv';
 import { fetchPriceHistorySheet, lookupQuote } from '../lib/priceHistorySheet';
-import { isWithinActiveRefreshWindow, SCHEDULE_CHECK_INTERVAL_MS, SCHEDULED_REFRESH_INTERVAL_MS } from '../lib/refreshSchedule';
 import { useFxRate } from './useFxRate';
 import { activeApiKeyFor, type PriceEntry } from '../types';
 
@@ -31,66 +30,11 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Module-scoped (not per-component), same reasoning and shape as
-// useAutoSync's syncInterval/syncedSheetUrl — one refresh loop shared across
-// every mounted instance of usePrices (Layout, for the background behavior,
-// and SettingsPanel, for the manual button), re-arming itself on a fixed
-// interval instead of only ever firing once on mount. The previous version
-// fetched exactly once per page load and never again, so prices went stale
-// for the rest of the session no matter how long the page stayed open.
-let refreshInterval: ReturnType<typeof setInterval> | null = null;
-let refreshingKey: string | null = null;
-// The interval callback currently in effect, kept module-scoped alongside
-// refreshInterval/refreshingKey so the visibilitychange listener below (also
-// module-scoped, attached once) can call/restart the *current* owning
-// instance's refreshPrices closure without every instance needing its own
-// listener.
-let activeRefresh: (() => void) | null = null;
-let visibilityListenerAttached = false;
-// When the scheduler last actually called activeRefresh (not just checked
-// whether it should). Module-scoped like the rest of this file's timer
-// state — resets to 0 on a full page reload, which is fine: if that reload
-// happens inside an active window, the next scheduler tick just refreshes
-// right away instead of waiting out a stale hour-old timestamp.
-let lastAutoRefreshAt = 0;
-
-// Ticks every SCHEDULE_CHECK_INTERVAL_MS (cheap — just a clock check, no
-// API calls) and only actually calls activeRefresh once both: we're inside
-// one of the active hours (see lib/refreshSchedule.ts — TW market hours
-// plus the US evening session) and it's been at least
-// SCHEDULED_REFRESH_INTERVAL_MS since the last real refresh. Replaced a
-// flat "refresh every 30 minutes all day" interval that kept burning
-// Twelve Data credits long after trading hours, on the assumption that
-// nobody's actually watching prices move outside those windows anyway.
-function scheduledRefreshTick() {
-  if (!activeRefresh) return;
-  const now = Date.now();
-  if (!isWithinActiveRefreshWindow(new Date(now))) return;
-  if (now - lastAutoRefreshAt < SCHEDULED_REFRESH_INTERVAL_MS) return;
-  lastAutoRefreshAt = now;
-  activeRefresh();
-}
-
-// A backgrounded tab still burns through Twelve Data's daily credit budget
-// on a schedule nobody's watching, so the interval still pauses while
-// hidden. It used to also fire an immediate refresh on refocus ("catch up
-// now that you're looking again"), but that made switching back to the tab
-// feel like it was hammering the API on every glance — refocusing just
-// resumes the scheduler instead, so the next refresh happens on its normal
-// schedule (still gated by the active window) rather than the instant you
-// look back.
-function handlePricesVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-      refreshInterval = null;
-    }
-    return;
-  }
-  if (!activeRefresh) return;
-  if (!refreshInterval) refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
-}
-
+// Manual-only: prices are fetched solely by the 「立即刷新報價」 button
+// (RefreshControl). There used to be a windowed hourly auto-refresh here, but
+// it only ran during set hours, missed most of the US session, and spent
+// Twelve Data credits on its own schedule — refreshing on demand gives the
+// latest quote exactly when it's being looked at.
 export function usePrices() {
   const { holdings, settings, prices, cashBalances, applyPriceUpdates, recordCurrentSnapshot } = usePortfolio();
   const { effectiveUsdToTwd, effectiveJpyToTwd } = useFxRate();
@@ -220,65 +164,6 @@ export function usePrices() {
     setErrors(Array.from(new Set(fetchErrors)));
     setIsRefreshing(false);
   };
-
-  useEffect(() => {
-    const hasProvider = settings.priceProvider !== 'none' && activeApiKeyFor(settings).trim().length > 0;
-    const hasTwSheet = settings.priceHistorySheetUrl.trim().length > 0;
-    const enabled = (hasProvider || hasTwSheet) && holdings.length > 0;
-    const key = enabled
-      ? `${settings.priceProvider}|${activeApiKeyFor(settings)}|${settings.priceHistorySheetUrl}|${holdings.length}`
-      : null;
-
-    if (!key) {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-      }
-      refreshingKey = null;
-      activeRefresh = null;
-      return;
-    }
-    if (refreshingKey === key) return; // another mounted instance already refreshes this configuration
-
-    refreshingKey = key;
-    activeRefresh = refreshPrices;
-    if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = null;
-
-    if (!visibilityListenerAttached) {
-      document.addEventListener('visibilitychange', handlePricesVisibilityChange);
-      visibilityListenerAttached = true;
-    }
-
-    // Tab is backgrounded right now — defer both the immediate refresh and
-    // the interval to handlePricesVisibilityChange, whenever it next becomes
-    // visible, instead of spending credits on a tab nobody's watching.
-    if (document.visibilityState === 'hidden') return;
-
-    // Only auto-refresh right away if we're actually inside an active
-    // window — landing on the page at, say, 3pm shouldn't immediately spend
-    // a refresh just because the tab opened; it should wait for 9pm like
-    // any other scheduled tick would. The manual "立即刷新報價" button
-    // (SettingsPanel) calls refreshPrices directly and isn't affected by
-    // this gate — it always refreshes regardless of the window.
-    if (isWithinActiveRefreshWindow(new Date())) {
-      lastAutoRefreshAt = Date.now();
-      refreshPrices();
-    }
-    refreshInterval = setInterval(scheduledRefreshTick, SCHEDULE_CHECK_INTERVAL_MS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.priceHistorySheetUrl, holdings.length]);
-
-  // Keep the scheduler pointed at the *latest* render's refreshPrices. The
-  // effect above only assigns activeRefresh when the config key changes, so
-  // without this the hourly tick kept calling the closure from the first
-  // render — computing snapshots from mount-time holdings / prices / FX
-  // rate / cash balances (e.g. holdings later updated by the Sheet sync, or
-  // an FX rate that was still null on first load, which silently skipped
-  // recording the snapshot altogether).
-  useEffect(() => {
-    if (refreshingKey !== null && activeRefresh !== null) activeRefresh = refreshPrices;
-  });
 
   return { refreshPrices, isRefreshing, errors };
 }

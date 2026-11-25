@@ -16,7 +16,6 @@ import {
   computeSymbolValues,
   computeTotalCostInTwd,
   computeTotalInTwd,
-  todayDateString,
 } from '../src/lib/calculations';
 import { recordSnapshot } from '../src/hooks/useSnapshots';
 import { DEFAULT_SHEET_URL } from '../src/lib/config';
@@ -28,6 +27,16 @@ const API_KEY = process.env.TWELVEDATA_API_KEY?.trim();
 const OUTPUT_PATH = fileURLToPath(new URL('../public/snapshots.json', import.meta.url));
 // Twelve Data's free tier rate limit — matches the delay usePrices.ts uses in the browser.
 const QUOTE_DELAY_MS = 8_000;
+
+// The snapshot's date label. Scheduled for 22:00 UTC (date D), but GitHub's
+// cron routinely starts hours late — recent runs began 02:00–05:45 UTC on
+// D+1 — and labeling with the plain UTC date then filed day D's snapshot
+// under D+1, leaving D empty and later overwriting the browser's real D+1
+// record with a value captured mid-TW-session. Shifting back 8 hours keeps
+// any run from 08:00 UTC D up to 08:00 UTC D+1 labeled D.
+function snapshotDateLabel(): string {
+  return new Date(Date.now() - 8 * 60 * 60_000).toISOString().slice(0, 10);
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -117,9 +126,9 @@ async function main() {
     classCostValues: computeClassCostValues(metrics),
     symbolValues: computeSymbolValues(metrics),
     symbolCostValues: computeSymbolCostValues(metrics),
-  });
+  }, snapshotDateLabel());
   writeFileSync(OUTPUT_PATH, `${JSON.stringify(next, null, 2)}\n`);
-  console.log(`Recorded snapshot for ${todayDateString()}: ${totalTwd.toFixed(0)} TWD (${symbols.length} symbols)`);
+  console.log(`Recorded snapshot for ${snapshotDateLabel()}: ${totalTwd.toFixed(0)} TWD (${symbols.length} symbols)`);
 }
 
 main().catch((err) => {

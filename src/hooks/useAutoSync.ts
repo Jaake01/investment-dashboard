@@ -10,6 +10,11 @@ const AUTO_SYNC_INTERVAL_MS = 15 * 60_000;
 // sheet URL regardless of how many components call this hook.
 let syncInterval: ReturnType<typeof setInterval> | null = null;
 let syncedSheetUrl: string | null = null;
+// Latest render's runSync. The interval used to call the closure captured on
+// mount, whose mergeHoldingsFromImport merged against mount-time `holdings`
+// — so every 15-minute sync rebuilt holdings from that stale list, dropping
+// anything added or changed since (manual edits, cloud-synced holdings).
+let latestRunSync: ((sheetUrl: string) => Promise<void>) | null = null;
 
 export function useAutoSync() {
   const { settings, mergeHoldingsFromImport, setTransactions } = usePortfolio();
@@ -47,9 +52,13 @@ export function useAutoSync() {
     syncedSheetUrl = sheetUrl;
     if (syncInterval) clearInterval(syncInterval);
     runSync(sheetUrl);
-    syncInterval = setInterval(() => runSync(sheetUrl), AUTO_SYNC_INTERVAL_MS);
+    syncInterval = setInterval(() => latestRunSync?.(sheetUrl), AUTO_SYNC_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.sheetUrl]);
+
+  useEffect(() => {
+    latestRunSync = runSync;
+  });
 
   return { isSyncing, error, lastSyncedAt };
 }

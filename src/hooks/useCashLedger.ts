@@ -16,6 +16,9 @@ const AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 // recurring refresh.
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let refreshingSheetUrl: string | null = null;
+// Latest render's refreshCashLedger, so the interval never runs a closure
+// frozen at mount (same fix as useAutoSync's latestRunSync).
+let latestRefresh: (() => Promise<void>) | null = null;
 
 export function useCashLedger() {
   const { settings, setCashBalances } = usePortfolio();
@@ -52,9 +55,13 @@ export function useCashLedger() {
     refreshingSheetUrl = url;
     if (refreshInterval) clearInterval(refreshInterval);
     refreshCashLedger();
-    refreshInterval = setInterval(refreshCashLedger, AUTO_REFRESH_INTERVAL_MS);
+    refreshInterval = setInterval(() => latestRefresh?.(), AUTO_REFRESH_INTERVAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.cashLedgerSheetUrl]);
+
+  useEffect(() => {
+    latestRefresh = refreshCashLedger;
+  });
 
   return { refreshCashLedger, isRefreshing, error };
 }

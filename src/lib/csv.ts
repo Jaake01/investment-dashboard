@@ -204,7 +204,7 @@ export async function fetchAndParseSheet(sheetUrl: string): Promise<SheetImportR
   }
   let response: Response;
   try {
-    response = await fetch(sheetUrl);
+    response = await fetch(sheetUrl, { cache: 'no-store' });
   } catch {
     throw new CsvImportError('無法連線到該網址，請確認網路連線與網址是否正確');
   }

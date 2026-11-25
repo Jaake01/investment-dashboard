@@ -114,7 +114,7 @@ export async function fetchCashLedgerSheet(url: string): Promise<Record<string, 
 
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { cache: 'no-store' });
   } catch {
     throw new CsvImportError('無法連線到現金帳戶 Sheet');
   }

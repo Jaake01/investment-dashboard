@@ -129,6 +129,12 @@ export function useFxRate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAutoFetch]);
 
+  // Same as usePrices.ts: keep the scheduler on the latest closure instead of
+  // the one captured when the key was first set (stale fxRate fallback).
+  useEffect(() => {
+    if (refreshingKey !== null && activeRefresh !== null) activeRefresh = refreshFxRate;
+  });
+
   const effectiveUsdToTwd = fxRate?.usdToTwd ?? null;
   const effectiveJpyToTwd = fxRate?.jpyToTwd ?? null;
   const updatedAt = fxRate?.updatedAt ?? null;

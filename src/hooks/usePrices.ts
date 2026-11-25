@@ -269,5 +269,16 @@ export function usePrices() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.priceProvider, settings.finnhubApiKey, settings.twelveDataApiKey, settings.priceHistorySheetUrl, holdings.length]);
 
+  // Keep the scheduler pointed at the *latest* render's refreshPrices. The
+  // effect above only assigns activeRefresh when the config key changes, so
+  // without this the hourly tick kept calling the closure from the first
+  // render — computing snapshots from mount-time holdings / prices / FX
+  // rate / cash balances (e.g. holdings later updated by the Sheet sync, or
+  // an FX rate that was still null on first load, which silently skipped
+  // recording the snapshot altogether).
+  useEffect(() => {
+    if (refreshingKey !== null && activeRefresh !== null) activeRefresh = refreshPrices;
+  });
+
   return { refreshPrices, isRefreshing, errors };
 }

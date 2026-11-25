@@ -24,7 +24,7 @@ export async function fetchPriceHistorySheet(url: string): Promise<Record<string
 
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { cache: 'no-store' });
   } catch {
     throw new CsvImportError('無法連線到股價歷史 Sheet');
   }
